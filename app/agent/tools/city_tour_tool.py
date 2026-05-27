@@ -27,9 +27,11 @@ _VISIT_MINUTES = 45  # default time at each stop
 # ── Geocoding ──────────────────────────────────────────────────────────────────
 
 
-# Viewbox half-size around city centre (degrees) — ≈ 8–10 km radius
-_VBOX_LON = 0.12
-_VBOX_LAT = 0.09
+# Viewbox half-size around city centre (degrees).
+# ±0.25° lon ≈ ±18 km, ±0.18° lat ≈ ±20 km — covers even large metro areas
+# while preventing cross-city false matches.
+_VBOX_LON = 0.25
+_VBOX_LAT = 0.18
 
 
 async def _nominatim_search(
@@ -75,16 +77,16 @@ async def _geocode_one(
     Stage 1: '{name}, {city}'           — precise compound query
     Stage 2: '{name}' + viewbox bounded — name-only but geographically constrained
     """
-    # Stage 1: compound query (biased to city area, not hard-bounded)
-    hit = await _nominatim_search(client, f"{name}, {city}", city_center=city_center)
+    # Stage 1: compound query, hard-bounded to city viewbox
+    hit = await _nominatim_search(client, f"{name}, {city}", city_center=city_center, bounded=True)
     if hit:
         return {"name": name, **hit}
 
-    # Stage 2: name-only, hard-bounded to city viewbox (avoids cross-country false hits)
+    # Stage 2: name-only, also hard-bounded (different tokenisation may help)
     await asyncio.sleep(1.1)
     hit = await _nominatim_search(client, name, city_center=city_center, bounded=True)
     if hit:
-        logger.info("tour_geo_fallback: %r found via bounded name-only search", name)
+        logger.info("tour_geo_fallback: %r found via name-only bounded search", name)
         return {"name": name, **hit}
 
     return None
