@@ -22,9 +22,6 @@ ENV SOLARIS_DB_URL=sqlite+aiosqlite:///./data/solaris.db
 # ENV SOLARIS_DB_URL=sqlite+aiosqlite:////var/lib/solaris/solaris.db
 # ──────────────────────────────────────────────────────────────────────────
 
-RUN mkdir -p data
-VOLUME /app/data
-
 EXPOSE 8000
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
