@@ -28,6 +28,11 @@ class ChatResponse(BaseModel):
         description="2–4 short button labels for nearby places the user can tap to learn more. "
         "Only include when nearby landmarks are present in the context. Empty list [] otherwise.",
     )
+    recommended_personas: list[str] = Field(
+        description="0–2 persona slugs that would each add genuinely different valuable context "
+        "to this specific location. "
+        "Empty list [] if no strong reason exists or this is a follow-up question.",
+    )
 
 
 # ── Content ───────────────────────────────────────────────────────────────────
@@ -110,6 +115,9 @@ class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"] = Field(description="Role of the message sender")
     content: Content = Field(description="Structured content of the message")
     suggestions: list[str] = Field(default_factory=list, description="Quick-reply place suggestions")
+    recommended_personas: list[str] = Field(
+        default_factory=list, description="LLM-suggested specialist persona slugs (0-2)"
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="Timestamp when the message was created",

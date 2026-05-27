@@ -60,6 +60,7 @@ async def save_message(
     content_text: str,
     llm_trace: LllmTrace | None = None,
     model: str | None = None,
+    suggestions: list[str] | None = None,
 ) -> MessageORM:
     msg = MessageORM(
         id=str(uuid.uuid4()),
@@ -67,6 +68,7 @@ async def save_message(
         role=role,
         content_text=content_text,
         model=model,
+        suggestions_text=", ".join(suggestions) if suggestions else None,
         input_tokens=llm_trace.input_tokens if llm_trace else 0,
         output_tokens=llm_trace.output_tokens if llm_trace else 0,
         total_tokens=llm_trace.total_tokens if llm_trace else 0,
@@ -109,8 +111,17 @@ async def get_recent_messages(
         .limit(limit)
     )
     rows = result.scalars().all()
+
     # reverse to chronological order before returning
-    return [{"role": m.role, "content": m.content_text} for m in reversed(rows)]
+    # For assistant messages that had suggestion buttons, append a note so the LLM
+    # knows which places were already shown and avoids repeating them.
+    def _to_llm(m: MessageORM) -> dict:
+        text = m.content_text
+        if m.role == "assistant" and m.suggestions_text:
+            text += f"\n[Shown suggestion buttons: {m.suggestions_text}]"
+        return {"role": m.role, "content": text}
+
+    return [_to_llm(m) for m in reversed(rows)]
 
 
 async def get_user_settings(db: AsyncSession, chat_id: int) -> dict:

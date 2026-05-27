@@ -154,9 +154,9 @@ async def test_no_location_pipeline(factory):
 
 
 @pytest.mark.integration
-async def test_dark_tourism_persona(factory):
-    """dark_tourism persona must complete the pipeline without errors."""
-    request = ChatRequest(**COLOSSEUM, persona=Persona.dark_tourism)
+async def test_military_expert_persona(factory):
+    """military_expert persona must complete the pipeline without errors."""
+    request = ChatRequest(**COLOSSEUM, persona=Persona.military_expert)
     with _stub_tools():
         result = await factory.run(request)
     assert result.parsed_content.text

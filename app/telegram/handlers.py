@@ -134,10 +134,43 @@ def _fmt_kb(current: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def _suggestions_kb(suggestions: list[str]) -> InlineKeyboardMarkup:
-    """Build a row-per-suggestion keyboard from LLM place suggestions."""
-    # callback_data is limited to 64 bytes — truncate label to 55 chars to be safe
-    buttons = [[InlineKeyboardButton(text=s, callback_data=f"place:{s[:55]}")] for s in suggestions[:4]]
+_PERSONA_SWITCH_LABELS = {
+    "historian": "📜 Спросить историка",
+    "architecture_expert": "🏛 Спросить архитектора",
+    "roman_empire": "⚔️ Спросить о Риме",
+    "storyteller": "🎭 Услышать историю",
+    "medieval_resident": "🏚 Жизнь в Средние века",
+    "military_expert": "🗡 Военный взгляд",
+    "deep_time": "🧊 Взгляд геолога",
+}
+
+
+def _cb_data(prefix: str, text: str) -> str:
+    """Build a callback_data string that fits in Telegram's 64-byte hard limit.
+
+    Truncates `text` in UTF-8 byte space, then decodes safely to avoid splitting
+    a multi-byte codepoint.  Persona slugs are ASCII so no truncation needed there.
+    """
+    budget = 64 - len(prefix.encode())
+    encoded = text.encode("utf-8")
+    if len(encoded) <= budget:
+        return prefix + text
+    # Drop bytes from the end until we have a valid UTF-8 sequence
+    return prefix + encoded[:budget].decode("utf-8", errors="ignore")
+
+
+def _suggestions_kb(
+    suggestions: list[str], recommended_personas: list[str] | None = None
+) -> InlineKeyboardMarkup:
+    """Build a row-per-suggestion keyboard from LLM place suggestions.
+
+    Up to 3 place buttons come first; up to 2 persona-switch buttons are appended last.
+    """
+    buttons = [[InlineKeyboardButton(text=s, callback_data=_cb_data("place:", s))] for s in suggestions[:3]]
+    for slug in (recommended_personas or [])[:2]:
+        if slug in _PERSONA_SWITCH_LABELS:
+            label = _PERSONA_SWITCH_LABELS[slug]
+            buttons.append([InlineKeyboardButton(text=label, callback_data=_cb_data("mode:", slug))])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -151,6 +184,7 @@ _HELP = (
     "3. Отправь фото — бот определит объект и расскажет его историю\n\n"
     "<b>Команды:</b>\n"
     "/whereami — история текущего места\n"
+    "/continue — продолжить рассказ\n"
     "/modes — стиль рассказа\n"
     "/lang — язык ответов\n"
     "/fmt — формат текста (HTML / Markdown)\n"
@@ -182,6 +216,21 @@ async def cmd_whereami(message: Message) -> None:
         await message.answer("Сначала отправь геолокацию 📍", reply_markup=_location_kb)
         return
     await _dispatch(message, lat=session["lat"], lon=session["lon"], user_message=None)
+
+
+@router.message(Command("continue"))
+async def cmd_continue(message: Message) -> None:
+    chat_id = message.chat.id
+    session = await _get_session(chat_id)
+    if session.get("lat") is None:
+        await message.answer("Сначала отправь геолокацию 📍", reply_markup=_location_kb)
+        return
+    await _dispatch(
+        message,
+        lat=session["lat"],
+        lon=session["lon"],
+        user_message="Продолжи рассказ",
+    )
 
 
 @router.message(Command("modes"))
@@ -293,7 +342,9 @@ async def cb_mode(callback: CallbackQuery) -> None:
     await _persist_session(chat_id)
     label = _PERSONA_LABELS[persona]
     await callback.message.edit_text(
-        f"✅ Стиль: <b>{label}</b>\n\nОтправь локацию или /whereami чтобы получить рассказ.",
+        f"✅ Стиль: <b>{label}</b>\n\n"
+        "Отправь локацию или /whereami чтобы получить рассказ.\n"
+        "/continue — продолжить с новой персоной.",
         reply_markup=None,
     )
     await callback.answer()
@@ -457,11 +508,16 @@ async def _dispatch(
             response = await handle_chat(request, db)
         reply = response.content.text
         suggestions = response.suggestions
+        # Don't recommend the persona that's already active
+        # Filter out the currently active persona from recommendations
+        recommended_personas = [p for p in response.recommended_personas if p != persona.value]
     except Exception as e:
         logger.exception("TG dispatch error for chat %d", chat_id)
         reply = f"⚠️ Ошибка: {e}"
         suggestions = []
+        recommended_personas = []
 
-    markup = _suggestions_kb(suggestions) if suggestions else None
+    has_buttons = bool(suggestions) or bool(recommended_personas)
+    markup = _suggestions_kb(suggestions, recommended_personas) if has_buttons else None
     await thinking.delete()
     await message.answer(reply, parse_mode=_parse_mode(fmt), reply_markup=markup)

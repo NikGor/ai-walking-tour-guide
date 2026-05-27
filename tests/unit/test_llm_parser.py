@@ -80,14 +80,18 @@ def test_cost_calculation_prefix_match():
 
 
 def test_parse_returns_parsed_llm_response():
-    payload = json.dumps({"text": "The Colosseum was built in 70-80 AD.", "suggestions": []})
+    payload = json.dumps(
+        {"text": "The Colosseum was built in 70-80 AD.", "suggestions": [], "recommended_personas": []}
+    )
     resp = _make_response(payload)
     result = parse_openrouter_response(resp, ChatResponse)
     assert isinstance(result, ParsedLLMResponse)
 
 
 def test_parse_extracts_chat_response_text():
-    payload = json.dumps({"text": "Built by Emperor Vespasian.", "suggestions": []})
+    payload = json.dumps(
+        {"text": "Built by Emperor Vespasian.", "suggestions": [], "recommended_personas": []}
+    )
     resp = _make_response(payload)
     result = parse_openrouter_response(resp, ChatResponse)
     assert isinstance(result.parsed_content, ChatResponse)
@@ -95,7 +99,7 @@ def test_parse_extracts_chat_response_text():
 
 
 def test_parse_fills_llm_trace_tokens():
-    payload = json.dumps({"text": "test", "suggestions": []})
+    payload = json.dumps({"text": "test", "suggestions": [], "recommended_personas": []})
     resp = _make_response(payload, input_tokens=200, output_tokens=80)
     result = parse_openrouter_response(resp, ChatResponse)
     assert result.llm_trace.input_tokens == 200
@@ -104,7 +108,7 @@ def test_parse_fills_llm_trace_tokens():
 
 
 def test_parse_calculates_cost():
-    payload = json.dumps({"text": "test", "suggestions": []})
+    payload = json.dumps({"text": "test", "suggestions": [], "recommended_personas": []})
     resp = _make_response(payload, model="openai/gpt-4.1", input_tokens=1_000_000, output_tokens=0)
     result = parse_openrouter_response(resp, ChatResponse)
     assert result.llm_trace.total_cost == pytest.approx(2.0)
@@ -125,7 +129,7 @@ def test_parse_raises_on_empty_content():
 
 
 def test_parse_stores_response_id():
-    payload = json.dumps({"text": "hello", "suggestions": []})
+    payload = json.dumps({"text": "hello", "suggestions": [], "recommended_personas": []})
     resp = _make_response(payload)
     result = parse_openrouter_response(resp, ChatResponse)
     assert result.response_id == "test-response-id"

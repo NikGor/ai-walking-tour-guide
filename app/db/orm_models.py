@@ -37,6 +37,7 @@ class MessageORM(Base):
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    suggestions_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
     total_tokens: Mapped[int] = mapped_column(Integer, default=0)

@@ -79,6 +79,7 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
         content_text=content_text,
         llm_trace=parsed_result.llm_trace,
         model=parsed_result.llm_trace.model,
+        suggestions=result.suggestions or None,
     )
 
     await db.commit()
@@ -88,6 +89,7 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
         role="assistant",
         content=Content(text=content_text),
         suggestions=result.suggestions,
+        recommended_personas=result.recommended_personas,
         conversation_id=conv.id,
         model=parsed_result.llm_trace.model,
         llm_trace=parsed_result.llm_trace,
