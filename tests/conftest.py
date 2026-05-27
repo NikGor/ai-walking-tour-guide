@@ -7,6 +7,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# OpenAI SDK raises at import time if api_key is absent (even when we use OpenRouter).
+# Set a dummy value so unit tests that don't make real API calls can import freely.
+os.environ.setdefault("OPENAI_API_KEY", "sk-dummy-for-tests")
+os.environ.setdefault("OPENROUTER_API_KEY", "sk-dummy-for-tests")
+
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "integration: real LLM API calls (requires OPENROUTER_API_KEY)")
