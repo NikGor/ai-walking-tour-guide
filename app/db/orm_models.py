@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -43,3 +43,16 @@ class MessageORM(Base):
     total_cost: Mapped[float] = mapped_column(Float, default=0.0)
 
     conversation: Mapped["ConversationORM"] = relationship(back_populates="messages")
+
+
+class UserSettingsORM(Base):
+    """Persistent Telegram user settings — survives server restarts."""
+
+    __tablename__ = "user_settings"
+
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    persona: Mapped[str] = mapped_column(String(50), default="historian")
+    lang: Mapped[str] = mapped_column(String(10), default="auto")
+    lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lon: Mapped[float | None] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)

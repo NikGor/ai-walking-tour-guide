@@ -16,14 +16,40 @@ from sqlalchemy import func, select
 from app.agent.models.models import ChatRequest, Persona
 from app.api_controller import handle_chat
 from app.db.orm_models import ConversationORM, MessageORM
+from app.db.repository import get_user_settings, upsert_user_settings
 from app.db.session import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
 router = Router()
 
-# In-memory session: chat_id → {lat, lon, persona, lang}
+# Write-through cache: chat_id → {lat, lon, persona, lang}
+# Populated lazily from DB on first access; written to DB on every change.
 _sessions: dict[int, dict] = {}
+
+
+async def _get_session(chat_id: int) -> dict:
+    """Return session dict, loading from DB if not yet cached."""
+    if chat_id not in _sessions:
+        async with AsyncSessionLocal() as db:
+            _sessions[chat_id] = await get_user_settings(db, chat_id)
+    return _sessions[chat_id]
+
+
+async def _persist_session(chat_id: int) -> None:
+    """Write current in-memory session to DB."""
+    s = _sessions.get(chat_id, {})
+    async with AsyncSessionLocal() as db:
+        await upsert_user_settings(
+            db,
+            chat_id=chat_id,
+            persona=s.get("persona", "historian"),
+            lang=s.get("lang", "auto"),
+            lat=s.get("lat"),
+            lon=s.get("lon"),
+        )
+        await db.commit()
+
 
 # ── Keyboards ─────────────────────────────────────────────────────────────────
 
@@ -116,8 +142,8 @@ async def cmd_help(message: Message) -> None:
 @router.message(Command("whereami"))
 async def cmd_whereami(message: Message) -> None:
     chat_id = message.chat.id
-    session = _sessions.get(chat_id, {})
-    if "lat" not in session:
+    session = await _get_session(chat_id)
+    if session.get("lat") is None:
         await message.answer("Сначала отправь геолокацию 📍", reply_markup=_location_kb)
         return
     await _dispatch(message, lat=session["lat"], lon=session["lon"], user_message=None)
@@ -126,26 +152,27 @@ async def cmd_whereami(message: Message) -> None:
 @router.message(Command("modes"))
 async def cmd_modes(message: Message) -> None:
     chat_id = message.chat.id
-    persona = _sessions.get(chat_id, {}).get("persona", Persona.historian)
+    session = await _get_session(chat_id)
+    persona = Persona(session.get("persona", Persona.historian))
     await message.answer("Выбери стиль рассказа:", reply_markup=_modes_kb(persona))
 
 
 @router.message(Command("lang"))
 async def cmd_lang(message: Message) -> None:
     chat_id = message.chat.id
-    lang = _sessions.get(chat_id, {}).get("lang", "auto")
+    session = await _get_session(chat_id)
+    lang = session.get("lang", "auto")
     await message.answer("Выбери язык ответов:", reply_markup=_lang_kb(lang))
 
 
 @router.message(Command("new"))
 async def cmd_new(message: Message) -> None:
     chat_id = message.chat.id
-    session = _sessions.get(chat_id, {})
+    session = await _get_session(chat_id)
     # Keep persona and lang, clear location
-    _sessions[chat_id] = {
-        "persona": session.get("persona", Persona.historian),
-        "lang": session.get("lang", "auto"),
-    }
+    session["lat"] = None
+    session["lon"] = None
+    await _persist_session(chat_id)
     logger.info("\033[34mTG   ›\033[0m new conversation  chat=\033[36m%d\033[0m", chat_id)
     await message.answer(
         "🔄 <b>Новый разговор</b>\n\nЛокация и история сброшены. Отправь 📍 чтобы начать.",
@@ -189,8 +216,8 @@ async def cmd_history(message: Message) -> None:
 @router.message(Command("settings"))
 async def cmd_settings(message: Message) -> None:
     chat_id = message.chat.id
-    session = _sessions.get(chat_id, {})
-    persona = session.get("persona", Persona.historian)
+    session = await _get_session(chat_id)
+    persona = Persona(session.get("persona", Persona.historian))
     lang = session.get("lang", "auto")
     lat = session.get("lat")
     lon = session.get("lon")
@@ -217,7 +244,9 @@ async def cmd_settings(message: Message) -> None:
 async def cb_mode(callback: CallbackQuery) -> None:
     chat_id = callback.message.chat.id
     persona = Persona(callback.data.split(":", 1)[1])
-    _sessions.setdefault(chat_id, {})["persona"] = persona
+    session = await _get_session(chat_id)
+    session["persona"] = persona.value
+    await _persist_session(chat_id)
     label = _PERSONA_LABELS[persona]
     await callback.message.edit_text(
         f"✅ Стиль: <b>{label}</b>\n\nОтправь локацию или /whereami чтобы получить рассказ.",
@@ -230,7 +259,9 @@ async def cb_mode(callback: CallbackQuery) -> None:
 async def cb_lang(callback: CallbackQuery) -> None:
     chat_id = callback.message.chat.id
     lang = callback.data.split(":", 1)[1]
-    _sessions.setdefault(chat_id, {})["lang"] = lang
+    session = await _get_session(chat_id)
+    session["lang"] = lang
+    await _persist_session(chat_id)
     label = _LANG_LABELS[lang]
     await callback.message.edit_text(
         f"✅ Язык: <b>{label}</b>",
@@ -248,9 +279,10 @@ async def handle_location(message: Message) -> None:
     lat = message.location.latitude
     lon = message.location.longitude
 
-    session = _sessions.setdefault(chat_id, {"persona": Persona.historian, "lang": "auto"})
+    session = await _get_session(chat_id)
     session["lat"] = lat
     session["lon"] = lon
+    await _persist_session(chat_id)
 
     logger.info(
         "\033[34mTG   ›\033[0m location  chat=\033[36m%d\033[0m  lat=%.4f lon=%.4f",
@@ -264,8 +296,8 @@ async def handle_location(message: Message) -> None:
 @router.message(F.photo)
 async def handle_photo(message: Message) -> None:
     chat_id = message.chat.id
-    session = _sessions.get(chat_id, {})
-    if "lat" not in session:
+    session = await _get_session(chat_id)
+    if session.get("lat") is None:
         await message.answer("Сначала отправь геолокацию 📍, потом фото.", reply_markup=_location_kb)
         return
 
@@ -292,7 +324,7 @@ async def handle_photo(message: Message) -> None:
 async def handle_text(message: Message) -> None:
     chat_id = message.chat.id
     text = message.text.strip()
-    session = _sessions.get(chat_id, {})
+    session = await _get_session(chat_id)
     await _dispatch(
         message,
         lat=session.get("lat"),
@@ -312,8 +344,8 @@ async def _dispatch(
     photo_url: str | None = None,
 ) -> None:
     chat_id = message.chat.id
-    session = _sessions.get(chat_id, {})
-    persona = session.get("persona", Persona.historian)
+    session = await _get_session(chat_id)
+    persona = Persona(session.get("persona", Persona.historian))
     lang = session.get("lang", "auto")
 
     request = ChatRequest(

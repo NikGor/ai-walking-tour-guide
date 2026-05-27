@@ -13,7 +13,7 @@ from app.agent.models.models import (
     LllmTrace,
     OutputTokensDetails,
 )
-from app.db.orm_models import ConversationORM, MessageORM
+from app.db.orm_models import ConversationORM, MessageORM, UserSettingsORM
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +98,36 @@ async def get_recent_messages(
     rows = result.scalars().all()
     # reverse to chronological order before returning
     return [{"role": m.role, "content": m.content_text} for m in reversed(rows)]
+
+
+async def get_user_settings(db: AsyncSession, chat_id: int) -> dict:
+    """Load persisted Telegram user settings. Returns defaults if not found."""
+    result = await db.execute(select(UserSettingsORM).where(UserSettingsORM.chat_id == chat_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        return {"persona": "historian", "lang": "auto", "lat": None, "lon": None}
+    return {"persona": row.persona, "lang": row.lang, "lat": row.lat, "lon": row.lon}
+
+
+async def upsert_user_settings(
+    db: AsyncSession,
+    chat_id: int,
+    persona: str,
+    lang: str,
+    lat: float | None,
+    lon: float | None,
+) -> None:
+    """Insert or update user settings for a Telegram chat."""
+    result = await db.execute(select(UserSettingsORM).where(UserSettingsORM.chat_id == chat_id))
+    row = result.scalar_one_or_none()
+    if row:
+        row.persona = persona
+        row.lang = lang
+        row.lat = lat
+        row.lon = lon
+    else:
+        db.add(UserSettingsORM(chat_id=chat_id, persona=persona, lang=lang, lat=lat, lon=lon))
+    await db.flush()
 
 
 async def get_conversation(
