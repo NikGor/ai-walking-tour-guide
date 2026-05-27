@@ -27,12 +27,32 @@ _VISIT_MINUTES = 45  # default time at each stop
 # ── Geocoding ──────────────────────────────────────────────────────────────────
 
 
-async def _nominatim_search(client: httpx.AsyncClient, query: str) -> dict | None:
-    """Single Nominatim search, returns first hit or None."""
+# Viewbox half-size around city centre (degrees) — ≈ 8–10 km radius
+_VBOX_LON = 0.12
+_VBOX_LAT = 0.09
+
+
+async def _nominatim_search(
+    client: httpx.AsyncClient,
+    query: str,
+    city_center: tuple[float, float] | None = None,
+    bounded: bool = False,
+) -> dict | None:
+    """Single Nominatim search, returns first hit or None.
+
+    If city_center is given the viewbox biases results to that area.
+    bounded=True additionally restricts results to the viewbox only.
+    """
+    params: dict = {"q": query, "format": "json", "limit": 1, "addressdetails": 0}
+    if city_center:
+        clat, clon = city_center
+        params["viewbox"] = f"{clon - _VBOX_LON},{clat - _VBOX_LAT},{clon + _VBOX_LON},{clat + _VBOX_LAT}"
+        if bounded:
+            params["bounded"] = "1"
     try:
         resp = await client.get(
             _NOMINATIM_URL,
-            params={"q": query, "format": "json", "limit": 1, "addressdetails": 0},
+            params=params,
             headers={"User-Agent": "SolarisPliny/1.0 (walking-tour-guide)"},
             timeout=10.0,
         )
@@ -44,31 +64,54 @@ async def _nominatim_search(client: httpx.AsyncClient, query: str) -> dict | Non
     return None
 
 
-async def _geocode_one(client: httpx.AsyncClient, name: str, city: str) -> dict | None:
-    """Try two strategies: '{name}, {city}' then '{name}' alone."""
-    # Strategy 1: name + city (precise)
-    hit = await _nominatim_search(client, f"{name}, {city}")
+async def _geocode_one(
+    client: httpx.AsyncClient,
+    name: str,
+    city: str,
+    city_center: tuple[float, float] | None,
+) -> dict | None:
+    """Two-stage geocoding, both stages bounded to the city area.
+
+    Stage 1: '{name}, {city}'           — precise compound query
+    Stage 2: '{name}' + viewbox bounded — name-only but geographically constrained
+    """
+    # Stage 1: compound query (biased to city area, not hard-bounded)
+    hit = await _nominatim_search(client, f"{name}, {city}", city_center=city_center)
     if hit:
         return {"name": name, **hit}
 
-    # Strategy 2: name only (broader — works for unique landmarks)
-    await asyncio.sleep(1.1)  # extra rate-limit pause for the retry
-    hit = await _nominatim_search(client, name)
+    # Stage 2: name-only, hard-bounded to city viewbox (avoids cross-country false hits)
+    await asyncio.sleep(1.1)
+    hit = await _nominatim_search(client, name, city_center=city_center, bounded=True)
     if hit:
-        logger.info("tour_geo_fallback: %r found via name-only search", name)
+        logger.info("tour_geo_fallback: %r found via bounded name-only search", name)
         return {"name": name, **hit}
 
     return None
 
 
 async def _geocode_pois(city: str, poi_names: list[str]) -> list[dict]:
-    """Geocode POIs sequentially — Nominatim policy: ≤1 req/s."""
+    """Geocode POIs sequentially — Nominatim policy: ≤1 req/s.
+
+    First resolves the city centre, then uses that as a viewbox anchor
+    for all POI searches to prevent false cross-country matches.
+    """
     results: list[dict] = []
     async with httpx.AsyncClient() as client:
+        # Resolve city centre first — used as viewbox anchor for all POI searches
+        city_center: tuple[float, float] | None = None
+        city_hit = await _nominatim_search(client, city)
+        if city_hit:
+            city_center = (city_hit["lat"], city_hit["lon"])
+            logger.info("tour_city_center: %s → %.4f, %.4f", city, city_center[0], city_center[1])
+        else:
+            logger.warning("tour_city_center: could not resolve %r — searches will be unbound", city)
+        await asyncio.sleep(1.1)
+
         for i, name in enumerate(poi_names):
             if i > 0:
                 await asyncio.sleep(1.1)
-            result = await _geocode_one(client, name, city)
+            result = await _geocode_one(client, name, city, city_center)
             if result:
                 results.append(result)
                 logger.info(
