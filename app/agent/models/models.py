@@ -26,9 +26,8 @@ class ChatResponse(BaseModel):
 
     text: str
     suggestions: list[str] = Field(
-        default_factory=list,
         description="2–4 short button labels for nearby places the user can tap to learn more. "
-        "Only include when nearby landmarks are present in the context. Empty list otherwise.",
+        "Only include when nearby landmarks are present in the context. Empty list [] otherwise.",
     )
 
 
