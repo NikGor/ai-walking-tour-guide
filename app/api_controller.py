@@ -44,12 +44,16 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
     if request.latitude is not None and request.longitude is not None:
         logger.info(
             "\033[33mREQ  ›\033[0m lat=%.4f lon=%.4f  persona=\033[35m%s\033[0m  fmt=\033[36m%s\033[0m",
-            request.latitude, request.longitude, request.persona.value, request.response_format,
+            request.latitude,
+            request.longitude,
+            request.persona.value,
+            request.response_format,
         )
     else:
         logger.info(
             "\033[33mREQ  ›\033[0m no-location  persona=\033[35m%s\033[0m  fmt=\033[36m%s\033[0m",
-            request.persona.value, request.response_format,
+            request.persona.value,
+            request.response_format,
         )
 
     # ── DB: get or create conversation, load history ──────────────────────────
@@ -92,6 +96,7 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
     logger.info("=== STEP 4: Response Ready ===")
     logger.info(
         "\033[32mRESP ›\033[0m words=\033[33m%d\033[0m  \033[2mconv:%s\033[0m",
-        len(content_text.split()), conv.id[:8],
+        len(content_text.split()),
+        conv.id[:8],
     )
     return message

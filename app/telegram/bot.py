@@ -31,18 +31,21 @@ def get_dispatcher() -> Dispatcher:
 
 async def start_polling() -> None:
     from aiogram.types import BotCommand
+
     bot = get_bot()
     dp = get_dispatcher()
 
-    await bot.set_my_commands([
-        BotCommand(command="whereami",  description="История текущего места"),
-        BotCommand(command="modes",     description="Стиль рассказа"),
-        BotCommand(command="lang",      description="Язык ответов"),
-        BotCommand(command="new",       description="Начать новый разговор"),
-        BotCommand(command="history",   description="Статистика сессии"),
-        BotCommand(command="settings",  description="Все настройки"),
-        BotCommand(command="help",      description="Помощь"),
-    ])
+    await bot.set_my_commands(
+        [
+            BotCommand(command="whereami", description="История текущего места"),
+            BotCommand(command="modes", description="Стиль рассказа"),
+            BotCommand(command="lang", description="Язык ответов"),
+            BotCommand(command="new", description="Начать новый разговор"),
+            BotCommand(command="history", description="Статистика сессии"),
+            BotCommand(command="settings", description="Все настройки"),
+            BotCommand(command="help", description="Помощь"),
+        ]
+    )
 
     bot_info = await bot.get_me()
     logger.info(
