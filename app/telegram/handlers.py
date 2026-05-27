@@ -5,6 +5,7 @@ from pathlib import Path
 
 from aiogram import F, Router
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import (
     BufferedInputFile,
@@ -37,6 +38,19 @@ _PARSE_MODES: dict[str, ParseMode] = {
 
 def _parse_mode(fmt: str) -> ParseMode | None:
     return _PARSE_MODES.get(fmt)
+
+
+async def _safe_edit(message, text: str, **kwargs) -> None:
+    """Edit a text message's content — or, if the message has no text (e.g. voice),
+    remove its inline keyboard and send a new text message instead."""
+    try:
+        await message.edit_text(text, **kwargs)
+    except TelegramBadRequest:
+        try:
+            await message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await message.answer(text, **kwargs)
 
 
 logger = logging.getLogger(__name__)
@@ -426,7 +440,8 @@ async def cb_mode(callback: CallbackQuery) -> None:
     session["persona"] = persona.value
     await _persist_session(chat_id)
     label = _PERSONA_LABELS[persona]
-    await callback.message.edit_text(
+    await _safe_edit(
+        callback.message,
         f"✅ Стиль: <b>{label}</b>\n\n"
         "Отправь локацию или /whereami чтобы получить рассказ.\n"
         "/continue — продолжить с новой персоной.",
@@ -443,7 +458,8 @@ async def cb_lang(callback: CallbackQuery) -> None:
     session["lang"] = lang
     await _persist_session(chat_id)
     label = _LANG_LABELS[lang]
-    await callback.message.edit_text(
+    await _safe_edit(
+        callback.message,
         f"✅ Язык: <b>{label}</b>",
         reply_markup=None,
     )
@@ -487,7 +503,8 @@ async def cb_fmt(callback: CallbackQuery) -> None:
     session["fmt"] = fmt
     await _persist_session(chat_id)
     label = _FMT_LABELS[fmt]
-    await callback.message.edit_text(
+    await _safe_edit(
+        callback.message,
         f"✅ Формат: <b>{label}</b>",
         reply_markup=None,
         parse_mode=ParseMode.HTML,
