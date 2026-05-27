@@ -22,10 +22,9 @@ def _conv_title(request: ChatRequest) -> str:
 
 
 def _render(result: ChatResponse, fmt: str) -> str:
-    if fmt == "html":
-        return f"<p>{result.text}</p>"
     if fmt == "ssml":
-        return f"<speak><p>{result.text}</p></speak>"
+        return f"<speak>{result.text}</speak>"
+    # html and markdown: LLM formats the text directly, return as-is
     return result.text
 
 

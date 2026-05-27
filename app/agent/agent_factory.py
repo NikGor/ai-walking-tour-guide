@@ -77,6 +77,7 @@ class AgentFactory:
             location_ctx=location_ctx,
             message=request.message,
             language=request.language,
+            response_format=request.response_format,
         )
 
         user_content: str | list[dict[str, Any]] = (

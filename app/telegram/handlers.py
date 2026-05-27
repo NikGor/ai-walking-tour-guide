@@ -2,6 +2,7 @@ import logging
 import os
 
 from aiogram import F, Router
+from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import (
     CallbackQuery,
@@ -15,9 +16,15 @@ from sqlalchemy import func, select
 
 from app.agent.models.models import ChatRequest, Persona
 from app.api_controller import handle_chat
+from app.config import RESPONSE_FORMAT
 from app.db.orm_models import ConversationORM, MessageORM
 from app.db.repository import get_user_settings, upsert_user_settings
 from app.db.session import AsyncSessionLocal
+
+_PARSE_MODE: ParseMode | None = {
+    "html": ParseMode.HTML,
+    "markdown": ParseMode.MARKDOWN,
+}.get(RESPONSE_FORMAT)
 
 logger = logging.getLogger(__name__)
 
@@ -357,6 +364,7 @@ async def _dispatch(
         conversation_id=str(chat_id),
         user_name=message.from_user.first_name if message.from_user else None,
         language=None if lang == "auto" else lang,
+        response_format=RESPONSE_FORMAT,
     )
 
     thinking = await message.answer("⏳")
@@ -370,4 +378,4 @@ async def _dispatch(
         reply = f"⚠️ Ошибка: {e}"
 
     await thinking.delete()
-    await message.answer(reply)
+    await message.answer(reply, parse_mode=_PARSE_MODE)

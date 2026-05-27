@@ -24,6 +24,19 @@ class PromptBuilder:
         persona_voice = self.env.get_template(f"{persona}.j2").render()
         return f"{system}\n\n## Your persona\n\n{persona_voice}"
 
+    _FORMAT_HINTS: dict[str, str] = {
+        "html": (
+            "Format your response using basic Telegram HTML: "
+            "<b>bold</b> for names and titles, <i>italic</i> for terms or asides, "
+            "blank lines between paragraphs. No <p> tags. No headers."
+        ),
+        "markdown": (
+            "Format your response using Markdown: "
+            "**bold** for names and titles, *italic* for terms or asides, "
+            "blank lines between paragraphs."
+        ),
+    }
+
     def build_user_message(
         self,
         latitude: float | None,
@@ -32,6 +45,7 @@ class PromptBuilder:
         location_name: str | None = None,  # backward-compat for tests
         message: str | None = None,
         language: str | None = None,
+        response_format: str = "plain",
     ) -> str:
         _lang_names = {"ru": "Russian", "en": "English", "de": "German"}
         lines: list[str] = []
@@ -89,5 +103,10 @@ class PromptBuilder:
         if message:
             lines.append("")
             lines.append(f"User message: {message}")
+
+        hint = self._FORMAT_HINTS.get(response_format)
+        if hint:
+            lines.append("")
+            lines.append(f"Formatting: {hint}")
 
         return "\n".join(lines)
