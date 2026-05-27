@@ -6,7 +6,7 @@ from app.agent.models.models import ChatRequest, ChatResponse
 from app.agent.prompt_builder import PromptBuilder
 from app.agent.tools.registry import get_tools
 from app.backend.openrouter_client import OpenRouterClient
-from app.utils.geocoder import reverse_geocode
+from app.utils.geocoder import LocationContext, get_location_context
 from app.utils.llm_parser import ParsedLLMResponse, parse_openrouter_response
 
 logger = logging.getLogger(__name__)
@@ -26,14 +26,14 @@ class AgentFactory:
     ) -> ParsedLLMResponse:
         has_location = request.latitude is not None and request.longitude is not None
 
-        # ── Geocode ───────────────────────────────────────────────────────────
-        location_name: str | None = None
+        # ── Geocode + enrich ──────────────────────────────────────────────────
+        location_ctx: LocationContext | None = None
         if has_location:
             assert request.latitude is not None and request.longitude is not None
-            location_name = await reverse_geocode(request.latitude, request.longitude)
+            location_ctx = await get_location_context(request.latitude, request.longitude)
 
         # ── Build messages ────────────────────────────────────────────────────
-        messages = self._build_messages(request, history, location_name)
+        messages = self._build_messages(request, history, location_ctx)
 
         logger.info(
             "\033[35mLLM  ›\033[0m persona=\033[35m%s\033[0m  model=\033[36m%s\033[0m",
@@ -68,13 +68,13 @@ class AgentFactory:
         self,
         request: ChatRequest,
         history: list[dict[str, Any]] | None,
-        location_name: str | None,
+        location_ctx: LocationContext | None,
     ) -> list[dict[str, Any]]:
         system_prompt = self._prompt_builder.build_system_prompt(request.persona.value)
         user_message = self._prompt_builder.build_user_message(
             latitude=request.latitude,
             longitude=request.longitude,
-            location_name=location_name,
+            location_ctx=location_ctx,
             message=request.message,
             language=request.language,
         )
