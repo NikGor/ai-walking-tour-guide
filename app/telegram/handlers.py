@@ -317,11 +317,24 @@ async def cb_lang(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("place:"))
 async def cb_place(callback: CallbackQuery) -> None:
+    if not callback.message or not hasattr(callback.message, "answer"):
+        await callback.answer("⚠️ Сообщение недоступно")
+        return
+
     place_name = callback.data.split(":", 1)[1]
+    logger.info(
+        "\033[34mTG   ›\033[0m place tap  chat=\033[36m%d\033[0m  place=%r",
+        callback.message.chat.id,
+        place_name,
+    )
     await callback.answer()
-    # Remove buttons so it doesn't look like an active menu
-    await callback.message.edit_reply_markup(reply_markup=None)
-    # Dispatch as if the user typed a follow-up question about this place
+
+    # Remove buttons — ignore errors (message may already be edited or expired)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
     session = await _get_session(callback.message.chat.id)
     await _dispatch(
         callback.message,
