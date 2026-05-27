@@ -25,6 +25,11 @@ class ChatResponse(BaseModel):
     """LLM output — narrative text about the location."""
 
     text: str
+    suggestions: list[str] = Field(
+        default_factory=list,
+        description="2–4 short button labels for nearby places the user can tap to learn more. "
+        "Only include when nearby landmarks are present in the context. Empty list otherwise.",
+    )
 
 
 # ── Content ───────────────────────────────────────────────────────────────────
@@ -106,6 +111,7 @@ class ChatMessage(BaseModel):
     message_id: str | None = Field(default=None, description="Unique identifier for the message")
     role: Literal["user", "assistant", "system"] = Field(description="Role of the message sender")
     content: Content = Field(description="Structured content of the message")
+    suggestions: list[str] = Field(default_factory=list, description="Quick-reply place suggestions")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="Timestamp when the message was created",

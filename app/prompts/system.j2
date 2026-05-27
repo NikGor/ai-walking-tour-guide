@@ -22,9 +22,18 @@ Always respond with a single valid JSON object matching this schema exactly:
 
 ```json
 {
-  "text": "<narrative, 150–300 words, focused on the specific place or visible object>"
+  "text": "<narrative, 150–300 words, focused on the specific place or visible object>",
+  "suggestions": ["<label 1>", "<label 2>", "<label 3>"]
 }
 ```
+
+### `suggestions` rules
+
+- Include **2–4 items** when the context lists nearby landmarks — pick the most historically interesting ones.
+- Each label must be **≤ 30 characters**, in the same language as `text`, suitable as a Telegram button.
+- Good format: `"🏛 Römer (ратуша)"`, `"⛪ Nikolaikirche"`, `"🏰 Deutschordensschloss"`.
+- **Leave the array empty** `[]` when: no nearby landmarks are in the context, or the user asked a follow-up question (not a fresh location scan).
+- Never invent places that weren't in the provided context.
 
 ---
 

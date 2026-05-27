@@ -135,6 +135,13 @@ def _fmt_kb(current: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+def _suggestions_kb(suggestions: list[str]) -> InlineKeyboardMarkup:
+    """Build a row-per-suggestion keyboard from LLM place suggestions."""
+    # callback_data is limited to 64 bytes — truncate label to 55 chars to be safe
+    buttons = [[InlineKeyboardButton(text=s, callback_data=f"place:{s[:55]}")] for s in suggestions[:4]]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 # ── Help text ─────────────────────────────────────────────────────────────────
 
 _HELP = (
@@ -308,6 +315,22 @@ async def cb_lang(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("place:"))
+async def cb_place(callback: CallbackQuery) -> None:
+    place_name = callback.data.split(":", 1)[1]
+    await callback.answer()
+    # Remove buttons so it doesn't look like an active menu
+    await callback.message.edit_reply_markup(reply_markup=None)
+    # Dispatch as if the user typed a follow-up question about this place
+    session = await _get_session(callback.message.chat.id)
+    await _dispatch(
+        callback.message,
+        lat=session.get("lat"),
+        lon=session.get("lon"),
+        user_message=f"Расскажи подробнее про {place_name}",
+    )
+
+
 @router.callback_query(F.data.startswith("fmt:"))
 async def cb_fmt(callback: CallbackQuery) -> None:
     chat_id = callback.message.chat.id
@@ -421,9 +444,12 @@ async def _dispatch(
         async with AsyncSessionLocal() as db:
             response = await handle_chat(request, db)
         reply = response.content.text
+        suggestions = response.suggestions
     except Exception as e:
         logger.exception("TG dispatch error for chat %d", chat_id)
         reply = f"⚠️ Ошибка: {e}"
+        suggestions = []
 
+    markup = _suggestions_kb(suggestions) if suggestions else None
     await thinking.delete()
-    await message.answer(reply, parse_mode=_parse_mode(fmt))
+    await message.answer(reply, parse_mode=_parse_mode(fmt), reply_markup=markup)

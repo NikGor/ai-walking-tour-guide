@@ -87,6 +87,7 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
         message_id=str(uuid.uuid4()),
         role="assistant",
         content=Content(text=content_text),
+        suggestions=result.suggestions,
         conversation_id=conv.id,
         model=parsed_result.llm_trace.model,
         llm_trace=parsed_result.llm_trace,
