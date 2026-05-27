@@ -489,7 +489,9 @@
 
     <div class="result-actions">
       <button class="action-btn" onclick="goBack()">← Назад</button>
-      <button class="action-btn primary" onclick="saveImage()" id="save-btn">💾 Сохранить</button>
+      <button class="action-btn primary" onclick="onShareOrSave()" id="save-btn">
+        💾 Сохранить
+      </button>
     </div>
   </div>
 
@@ -784,8 +786,15 @@
     document.getElementById('result-location-text').textContent = `📍 ${data.location_name}`;
     document.getElementById('result-text').textContent = data.historical_text;
 
-    // Show save button only if there's an image
-    document.getElementById('save-btn').style.display = data.image_data ? '' : 'none';
+    // Show save/share button only if there's an image
+    const saveBtn = document.getElementById('save-btn');
+    if (data.image_data) {
+      saveBtn.style.display = '';
+      // Inside Telegram: offer to send to chat; outside: offer download
+      saveBtn.textContent = tg?.initData ? '📤 В чат' : '💾 Скачать';
+    } else {
+      saveBtn.style.display = 'none';
+    }
 
     if (tg?.MainButton) {
       tg.MainButton.hide();
@@ -799,13 +808,56 @@
     if (tg?.MainButton) updateMainButton();
   }
 
-  // ── Save image ─────────────────────────────────────────────────────────────
-  function saveImage() {
+  // ── Share / Save ───────────────────────────────────────────────────────────
+  function onShareOrSave() {
     if (!state.lastResult?.image_data) return;
+    if (tg?.initData) {
+      sendToChat();
+    } else {
+      downloadImage();
+    }
+  }
+
+  function downloadImage() {
+    const r = state.lastResult;
     const link = document.createElement('a');
-    link.href = `data:${state.lastResult.image_mime};base64,${state.lastResult.image_data}`;
-    link.download = `time_travel_${state.lastResult.era_label}.jpg`;
+    link.href = `data:${r.image_mime};base64,${r.image_data}`;
+    link.download = `time_travel_${r.era_label}.jpg`;
     link.click();
+  }
+
+  async function sendToChat() {
+    const r = state.lastResult;
+    const btn = document.getElementById('save-btn');
+    btn.textContent = '⏳ Отправляю…';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(`${API_BASE}/time-travel/send-to-chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_data:      r.image_data,
+          image_mime:      r.image_mime,
+          era_label:       r.era_label,
+          location_name:   r.location_name,
+          historical_text: r.historical_text,
+          init_data:       tg.initData,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      // Success — close the Mini App, photo arrives in chat
+      tg.close();
+    } catch (e) {
+      btn.textContent = '📤 В чат';
+      btn.disabled = false;
+      showError(`Не удалось отправить: ${e.message}`);
+    }
   }
 </script>
 </body>

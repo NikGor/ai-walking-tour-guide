@@ -15,6 +15,15 @@ class TimeTravelRequest(BaseModel):
     language: str = "ru"
 
 
+class SendToChatRequest(BaseModel):
+    image_data: str  # base64
+    image_mime: str = "image/jpeg"
+    era_label: str
+    location_name: str
+    historical_text: str
+    init_data: str = Field(default="", description="Telegram WebApp initData for auth")
+
+
 class TimeTravelResponse(BaseModel):
     image_data: str | None = None  # base64-encoded image bytes
     image_mime: str = "image/jpeg"

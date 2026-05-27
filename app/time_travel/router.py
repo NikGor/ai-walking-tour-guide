@@ -1,14 +1,20 @@
 """FastAPI routes for the Time Travel Lens Telegram Mini App."""
 
+import base64
+import hashlib
+import hmac
+import json
 import logging
 import os
 from pathlib import Path
+from urllib.parse import parse_qsl, unquote
 
-from fastapi import APIRouter
+import httpx
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 
 from app.time_travel.generator import generate_time_travel
-from app.time_travel.models import TimeTravelRequest, TimeTravelResponse
+from app.time_travel.models import SendToChatRequest, TimeTravelRequest, TimeTravelResponse
 
 logger = logging.getLogger(__name__)
 
@@ -47,3 +53,96 @@ async def generate(request: TimeTravelRequest) -> TimeTravelResponse:
             location_name="",
             error=str(e),
         )
+
+
+# ── Send to Telegram chat ──────────────────────────────────────────────────────
+
+
+def _validate_init_data(init_data: str) -> int | None:
+    """Validate Telegram WebApp initData and return chat_id (= user_id for private chats).
+
+    Returns None if invalid or bot token not set.
+    """
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token or not init_data:
+        return None
+
+    parsed = dict(parse_qsl(init_data, keep_blank_values=True))
+    received_hash = parsed.pop("hash", "")
+
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+
+    secret_key = hmac.new(
+        key=b"WebAppData",
+        msg=bot_token.encode(),
+        digestmod=hashlib.sha256,
+    ).digest()
+    expected_hash = hmac.new(
+        key=secret_key,
+        msg=data_check_string.encode(),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(received_hash, expected_hash):
+        logger.warning("time_travel_route_002: initData hash mismatch")
+        return None
+
+    try:
+        user = json.loads(unquote(parsed.get("user", "{}")))
+        return user.get("id")
+    except Exception:
+        return None
+
+
+@router.post("/send-to-chat")
+async def send_to_chat(request: SendToChatRequest) -> dict:
+    """Send the generated image to the user's Telegram chat."""
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token:
+        raise HTTPException(status_code=503, detail="Bot token not configured")
+
+    # Authenticate via initData (skip validation in local dev if token matches env)
+    chat_id = _validate_init_data(request.init_data)
+    if not chat_id:
+        raise HTTPException(status_code=403, detail="Invalid or missing initData")
+
+    logger.info(
+        "time_travel_route_003: sending photo to chat_id=%d  era=%s  loc=%r",
+        chat_id,
+        request.era_label,
+        request.location_name,
+    )
+
+    # Build caption (Telegram photo captions: max 1024 chars)
+    caption_parts = [
+        f"🕰 <b>{request.era_label}</b>",
+        f"📍 {request.location_name}",
+        "",
+        request.historical_text[:900],
+    ]
+    caption = "\n".join(caption_parts)
+
+    # Decode image
+    try:
+        image_bytes = base64.b64decode(request.image_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid image_data: {e}") from e
+
+    ext = "png" if "png" in request.image_mime.lower() else "jpg"
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"https://api.telegram.org/bot{bot_token}/sendPhoto",
+                data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
+                files={"photo": (f"time_travel.{ext}", image_bytes, request.image_mime)},
+            )
+        result = resp.json()
+        if not result.get("ok"):
+            logger.error("time_travel_route_error_002: Telegram API error: %s", result)
+            raise HTTPException(status_code=502, detail=result.get("description", "Telegram error"))
+        msg_id = result.get("result", {}).get("message_id")
+        logger.info("time_travel_route_004: photo sent ok  message_id=%s", msg_id)
+        return {"ok": True}
+    except httpx.TimeoutException as e:
+        raise HTTPException(status_code=504, detail="Telegram API timeout") from e
