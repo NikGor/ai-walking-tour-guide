@@ -14,8 +14,18 @@ from app.agent.models.models import (
     OutputTokensDetails,
 )
 from app.db.orm_models import ConversationORM, MessageORM, UserSettingsORM
+from app.db.session import DATABASE_URL
 
 logger = logging.getLogger(__name__)
+
+
+def _dialect_insert(table):
+    """Return a dialect-aware INSERT construct that supports ON CONFLICT clauses."""
+    if "postgresql" in DATABASE_URL:
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert
+    return insert(table)
 
 
 async def get_or_create_conversation(
@@ -23,20 +33,23 @@ async def get_or_create_conversation(
     conversation_id: str | None,
     title: str = "Walking Tour",
 ) -> ConversationORM:
-    if conversation_id:
-        result = await db.execute(select(ConversationORM).where(ConversationORM.id == conversation_id))
-        conv = result.scalar_one_or_none()
-        if conv:
-            logger.info("\033[36mCONV ›\033[0m resume  %s  \033[2m%s\033[0m", conv.id[:8], conv.title[:50])
-            return conv
+    new_id = conversation_id or str(uuid.uuid4())
+    is_resume = bool(conversation_id)
 
-    conv = ConversationORM(
-        id=conversation_id or str(uuid.uuid4()),
-        title=title,
+    # INSERT ... ON CONFLICT DO NOTHING — race-safe for concurrent Telegram retries
+    stmt = (
+        _dialect_insert(ConversationORM)
+        .values(id=new_id, title=title)
+        .on_conflict_do_nothing(index_elements=["id"])
     )
-    db.add(conv)
+    await db.execute(stmt)
     await db.flush()
-    logger.info("\033[36mCONV ›\033[0m new      %s  \033[2m%s\033[0m", conv.id[:8], conv.title[:50])
+
+    result = await db.execute(select(ConversationORM).where(ConversationORM.id == new_id))
+    conv = result.scalar_one()
+
+    action = "resume " if is_resume else "new    "
+    logger.info("\033[36mCONV ›\033[0m %s  %s  \033[2m%s\033[0m", action, conv.id[:8], conv.title[:50])
     return conv
 
 
@@ -117,16 +130,17 @@ async def upsert_user_settings(
     lat: float | None,
     lon: float | None,
 ) -> None:
-    """Insert or update user settings for a Telegram chat."""
-    result = await db.execute(select(UserSettingsORM).where(UserSettingsORM.chat_id == chat_id))
-    row = result.scalar_one_or_none()
-    if row:
-        row.persona = persona
-        row.lang = lang
-        row.lat = lat
-        row.lon = lon
-    else:
-        db.add(UserSettingsORM(chat_id=chat_id, persona=persona, lang=lang, lat=lat, lon=lon))
+    """Insert or update user settings for a Telegram chat — race-safe upsert."""
+    values = dict(chat_id=chat_id, persona=persona, lang=lang, lat=lat, lon=lon)
+    stmt = (
+        _dialect_insert(UserSettingsORM)
+        .values(**values)
+        .on_conflict_do_update(
+            index_elements=["chat_id"],
+            set_=dict(persona=persona, lang=lang, lat=lat, lon=lon),
+        )
+    )
+    await db.execute(stmt)
     await db.flush()
 
 
