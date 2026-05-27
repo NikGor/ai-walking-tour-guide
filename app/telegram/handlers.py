@@ -66,10 +66,8 @@ async def _persist_session(chat_id: int) -> None:
 
 # ── Keyboards ─────────────────────────────────────────────────────────────────
 
-_location_button = KeyboardButton(text="📍 Отправить локацию", request_location=True)
-_location_kb = ReplyKeyboardMarkup(
-    keyboard=[[_location_button]], resize_keyboard=True, one_time_keyboard=True
-)
+_location_button = KeyboardButton(text="📍 Локация", request_location=True)
+_location_kb = ReplyKeyboardMarkup(keyboard=[[_location_button]], resize_keyboard=True, is_persistent=True)
 
 _PERSONA_LABELS = {
     Persona.historian: "📜 Историк",
@@ -518,6 +516,13 @@ async def _dispatch(
         recommended_personas = []
 
     has_buttons = bool(suggestions) or bool(recommended_personas)
-    markup = _suggestions_kb(suggestions, recommended_personas) if has_buttons else None
+    # No location yet → show the persistent location keyboard so user can share.
+    # Location is known → show inline suggestions (reply keyboard persists independently).
+    if not session.get("lat"):
+        markup = _location_kb
+    elif has_buttons:
+        markup = _suggestions_kb(suggestions, recommended_personas)
+    else:
+        markup = None
     await thinking.delete()
     await message.answer(reply, parse_mode=_parse_mode(fmt), reply_markup=markup)
