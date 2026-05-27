@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.agent_factory import AgentFactory
 from app.agent.models.models import ChatMessage, ChatRequest, ChatResponse, Content
-from app.db.repository import get_or_create_conversation, save_message
+from app.db.repository import get_or_create_conversation, get_recent_messages, save_message
 
 load_dotenv()
 
@@ -16,7 +16,9 @@ _agent = AgentFactory()
 
 
 def _conv_title(request: ChatRequest) -> str:
-    return f"{request.latitude:.4f}, {request.longitude:.4f} | {request.persona.value}"
+    if request.latitude is not None and request.longitude is not None:
+        return f"{request.latitude:.4f}, {request.longitude:.4f} | {request.persona.value}"
+    return f"chat | {request.persona.value}"
 
 
 def _render(result: ChatResponse, fmt: str) -> str:
@@ -28,7 +30,10 @@ def _render(result: ChatResponse, fmt: str) -> str:
 
 
 def _user_content_text(request: ChatRequest) -> str:
-    lines = [f"📍 {request.latitude}, {request.longitude} | {request.persona.value}"]
+    if request.latitude is not None and request.longitude is not None:
+        lines = [f"📍 {request.latitude}, {request.longitude} | {request.persona.value}"]
+    else:
+        lines = [f"💬 {request.persona.value}"]
     if request.message:
         lines.append(request.message)
     return "\n".join(lines)
@@ -36,16 +41,23 @@ def _user_content_text(request: ChatRequest) -> str:
 
 async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
     logger.info("=== STEP 2: Chat Request ===")
-    logger.info(
-        "\033[33mREQ  ›\033[0m lat=%.4f lon=%.4f  persona=\033[35m%s\033[0m  fmt=\033[36m%s\033[0m",
-        request.latitude, request.longitude, request.persona.value, request.response_format,
-    )
+    if request.latitude is not None and request.longitude is not None:
+        logger.info(
+            "\033[33mREQ  ›\033[0m lat=%.4f lon=%.4f  persona=\033[35m%s\033[0m  fmt=\033[36m%s\033[0m",
+            request.latitude, request.longitude, request.persona.value, request.response_format,
+        )
+    else:
+        logger.info(
+            "\033[33mREQ  ›\033[0m no-location  persona=\033[35m%s\033[0m  fmt=\033[36m%s\033[0m",
+            request.persona.value, request.response_format,
+        )
 
-    # ── DB: get or create conversation ────────────────────────────────────────
-    parsed_result = await _agent.run(request)
-    result: ChatResponse = parsed_result.parsed_content
-
+    # ── DB: get or create conversation, load history ──────────────────────────
     conv = await get_or_create_conversation(db, request.conversation_id, title=_conv_title(request))
+    history = await get_recent_messages(db, conv.id, limit=12)
+
+    parsed_result = await _agent.run(request, history=history)
+    result: ChatResponse = parsed_result.parsed_content
 
     # ── Save user message ──────────────────────────────────────────────────────
     await save_message(

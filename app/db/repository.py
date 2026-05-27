@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -81,6 +81,23 @@ async def save_message(
         role, msg.id[:8], conversation_id[:8],
     )
     return msg
+
+
+async def get_recent_messages(
+    db: AsyncSession,
+    conversation_id: str,
+    limit: int = 12,
+) -> list[dict]:
+    """Return the last `limit` messages as OpenAI-format dicts for LLM context injection."""
+    result = await db.execute(
+        select(MessageORM)
+        .where(MessageORM.conversation_id == conversation_id)
+        .order_by(desc(MessageORM.created_at))
+        .limit(limit)
+    )
+    rows = result.scalars().all()
+    # reverse to chronological order before returning
+    return [{"role": m.role, "content": m.content_text} for m in reversed(rows)]
 
 
 async def get_conversation(

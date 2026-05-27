@@ -20,23 +20,22 @@ class PromptBuilder:
 
     def build_user_message(
         self,
-        latitude: float,
-        longitude: float,
-        retrieved_context: str,
-        detected_objects: str | None = None,
+        latitude: float | None,
+        longitude: float | None,
+        location_name: str | None,
         message: str | None = None,
+        language: str | None = None,
     ) -> str:
-        lines = [
-            f"Coordinates: {latitude}, {longitude}",
-            f"Location name: (not yet resolved)",
-        ]
-        if detected_objects:
-            lines.append(f"Detected in photo: {detected_objects}")
+        _LANG_NAMES = {"ru": "Russian", "en": "English", "de": "German"}
+        lines = []
+        if latitude is not None and longitude is not None:
+            lines.append(f"Coordinates: {latitude}, {longitude}")
+        if location_name:
+            lines.append(f"Location name: {location_name}")
+        if language and language != "auto":
+            lines.append(f"Language: {_LANG_NAMES.get(language, language)}")
         if message:
-            lines += ["", f"User message: {message}"]
-        lines += [
-            "",
-            "Retrieved context:",
-            retrieved_context,
-        ]
+            if lines:
+                lines.append("")
+            lines.append(f"User message: {message}")
         return "\n".join(lines)

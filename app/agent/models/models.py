@@ -179,8 +179,8 @@ class Conversation(BaseModel):
 class ChatRequest(BaseModel):
     """Walking tour chat request."""
 
-    latitude: float = Field(..., ge=-90, le=90, description="GPS latitude")
-    longitude: float = Field(..., ge=-180, le=180, description="GPS longitude")
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90, description="GPS latitude")
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180, description="GPS longitude")
     photo_url: Optional[str] = Field(
         default=None, description="Optional photo URL for scene detection"
     )
@@ -202,6 +202,10 @@ class ChatRequest(BaseModel):
     )
     previous_message_id: Optional[str] = Field(
         default=None, description="ID of the previous message for threading"
+    )
+    language: Optional[str] = Field(
+        default=None,
+        description="Force response language: 'ru', 'en', 'de'. None = auto-detect from message.",
     )
 
 

@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -24,7 +26,22 @@ async def lifespan(app: FastAPI):
     command.upgrade(alembic_cfg, "head")
     logger.info("main_001: DB migrations applied")
     logger.info("main_002: Solaris Pliny ready on \033[36m0.0.0.0:8000\033[0m")
+
+    tg_task = None
+    if os.getenv("TELEGRAM_BOT_TOKEN"):
+        from app.telegram.bot import start_polling
+        tg_task = asyncio.create_task(start_polling())
+    else:
+        logger.info("\033[34mTG   ›\033[0m TELEGRAM_BOT_TOKEN not set, skipping")
+
     yield
+
+    if tg_task:
+        tg_task.cancel()
+        try:
+            await tg_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(
