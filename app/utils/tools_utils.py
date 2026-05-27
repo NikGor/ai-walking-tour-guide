@@ -2,8 +2,8 @@ import inspect
 import logging
 from collections.abc import Callable
 from typing import Any, Literal, get_args, get_origin, get_type_hints
-import docstring_parser
 
+import docstring_parser
 
 logger = logging.getLogger(__name__)
 
@@ -144,9 +144,7 @@ def gemini_parse(func: Callable) -> dict[str, Any]:
         prop = {"type": _map_type(hint), "description": param.description or ""}
 
         if "allowed values:" in (param.description or "").lower():
-            allowed = (
-                (param.description or "").lower().split("allowed values:")[1].strip()
-            )
+            allowed = (param.description or "").lower().split("allowed values:")[1].strip()
             prop["enum"] = [v.strip() for v in allowed.split(",")]
 
         if "date" in (param.description or "").lower():

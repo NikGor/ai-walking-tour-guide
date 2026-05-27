@@ -8,7 +8,6 @@ from ..models.ws_models import StatusCallback, StatusNotifier
 from ..tools.tool_factory import ToolFactory
 from .status_messages import get_tool_detail
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -21,9 +20,7 @@ async def execute_tool_call(
     tool_factory: ToolFactory | None = None,
     on_status: StatusCallback = None,
 ) -> ToolResult:
-    logger.info(
-        f"tool_executor_001: Executing tool: \033[36m{tool_call.tool_name}\033[0m"
-    )
+    logger.info(f"tool_executor_001: Executing tool: \033[36m{tool_call.tool_name}\033[0m")
     if tool_factory is None:
         tool_factory = ToolFactory()
     notifier = StatusNotifier(on_status)
@@ -41,9 +38,7 @@ async def execute_tool_call(
             tool_name=tool_call.tool_name,
             tool_arguments=arguments_dict,
         )
-        logger.info(
-            f"tool_executor_003: Tool \033[36m{tool_call.tool_name}\033[0m executed successfully"
-        )
+        logger.info(f"tool_executor_003: Tool \033[36m{tool_call.tool_name}\033[0m executed successfully")
         await notifier.emit(
             "tools",
             "completed",
@@ -56,9 +51,7 @@ async def execute_tool_call(
             output=result,
         )
     except Exception as e:
-        logger.error(
-            f"tool_executor_error_001: Tool \033[31m{tool_call.tool_name}\033[0m failed: {e}"
-        )
+        logger.error(f"tool_executor_error_001: Tool \033[31m{tool_call.tool_name}\033[0m failed: {e}")
         await notifier.emit(
             "tools",
             "failed",
@@ -81,14 +74,11 @@ async def execute_tool_calls(
     logger.info(f"tool_executor_004: Executing \033[33m{len(tool_calls)}\033[0m tools")
     if tool_factory is None:
         tool_factory = ToolFactory()
-    tasks = [
-        execute_tool_call(tool_call, tool_factory, on_status)
-        for tool_call in tool_calls
-    ]
+    tasks = [execute_tool_call(tool_call, tool_factory, on_status) for tool_call in tool_calls]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     successful = sum(1 for r in results if isinstance(r, ToolResult) and r.success)
     logger.info(
-        f"tool_executor_005: Completed: \033[32m{successful}\033[0m successful, \033[31m{len(results) - successful}\033[0m failed"
+        f"tool_executor_005: Completed: \033[32m{successful}\033[0m successful, \033[31m{len(results) - successful}\033[0m failed"  # noqa: E501
     )
     return [
         (

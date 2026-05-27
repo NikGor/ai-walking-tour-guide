@@ -5,7 +5,6 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -40,13 +39,9 @@ async def call_with_retry(
         except retryable_exceptions as e:
             if attempt == max_retries - 1:
                 logger.error(
-                    f"{context}_retry_exhausted: all {max_retries} attempts failed: "
-                    f"\033[31m{e!s}\033[0m"
+                    f"{context}_retry_exhausted: all {max_retries} attempts failed: \033[31m{e!s}\033[0m"
                 )
                 raise
-            delay = base_delay * (2 ** attempt)
-            logger.warning(
-                f"{context}_retry_{attempt + 1}: \033[33m{e!s}\033[0m "
-                f"— retrying in {delay:.1f}s"
-            )
+            delay = base_delay * (2**attempt)
+            logger.warning(f"{context}_retry_{attempt + 1}: \033[33m{e!s}\033[0m — retrying in {delay:.1f}s")
             await asyncio.sleep(delay)

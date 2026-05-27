@@ -3,6 +3,7 @@
 import logging
 import os
 from typing import Any
+
 from openai import (
     APIConnectionError,
     InternalServerError,
@@ -10,8 +11,8 @@ from openai import (
     RateLimitError,
 )
 from pydantic import BaseModel
-from app.utils.retry_utils import call_with_retry
 
+from app.utils.retry_utils import call_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +43,7 @@ class OpenRouterClient:
                     f"Output: \033[33m{output_tok}\033[0m | "
                     f"Total: \033[33m{total_tok}\033[0m"
                 )
-            logger.info(
-                f"openrouter_client_005: Model: \033[36m{response.model}\033[0m"
-            )
+            logger.info(f"openrouter_client_005: Model: \033[36m{response.model}\033[0m")
         except Exception as e:
             logger.warning(f"openrouter_client_warning_001: Could not log usage: {e}")
 
@@ -83,9 +82,7 @@ class OpenRouterClient:
                 schema["properties"].pop("response_id", None)
                 if "required" in schema:
                     schema["required"] = [
-                        field
-                        for field in schema["required"]
-                        if field not in ["llm_trace", "response_id"]
+                        field for field in schema["required"] if field not in ["llm_trace", "response_id"]
                     ]
             self._enforce_no_additional_properties(schema)
             create_kwargs["response_format"] = {
@@ -97,9 +94,7 @@ class OpenRouterClient:
                 },
             }
         if tools:
-            create_kwargs["tools"] = [
-                {"type": "function", "function": tool} for tool in tools
-            ]
+            create_kwargs["tools"] = [{"type": "function", "function": tool} for tool in tools]
         return create_kwargs
 
     async def create_completion(
@@ -122,16 +117,12 @@ class OpenRouterClient:
             msg_breakdown[role] = msg_breakdown.get(role, 0) + 1
         logger.info(
             f"openrouter_client_002: Calling \033[36m{model}\033[0m with \033[33m{len(messages)}\033[0m msgs "
-            f"(system: {msg_breakdown.get('system', 0)}, user: {msg_breakdown.get('user', 0)}, assistant: {msg_breakdown.get('assistant', 0)})"
+            f"(system: {msg_breakdown.get('system', 0)}, user: {msg_breakdown.get('user', 0)}, assistant: {msg_breakdown.get('assistant', 0)})"  # noqa: E501
         )
         if previous_response_id:
-            logger.info(
-                "openrouter_client_003: previous_response_id ignored (not supported by OpenRouter)"
-            )
+            logger.info("openrouter_client_003: previous_response_id ignored (not supported by OpenRouter)")
         try:
-            create_kwargs = self._build_create_kwargs(
-                messages, model, response_format, tools
-            )
+            create_kwargs = self._build_create_kwargs(messages, model, response_format, tools)
             response = await call_with_retry(
                 lambda: self.client.chat.completions.create(**create_kwargs),
                 retryable_exceptions=(
@@ -146,4 +137,3 @@ class OpenRouterClient:
         except Exception as e:
             logger.error(f"openrouter_client_error_001: \033[31m{e!s}\033[0m")
             raise
-

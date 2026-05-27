@@ -1,9 +1,9 @@
 import logging
 import os
 from typing import Any
+
 from google import genai
 from google.genai import types
-
 
 logger = logging.getLogger(__name__)
 
@@ -24,16 +24,12 @@ async def google_search_tool(query: str) -> dict[str, Any]:
     Returns:
         Dict with grounded answer text, sources list, and metadata
     """
-    logger.info(
-        f"google_search_001: Search requested for query: \033[36m{query}\033[0m"
-    )
+    logger.info(f"google_search_001: Search requested for query: \033[36m{query}\033[0m")
 
     try:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            logger.error(
-                "google_search_error_001: \033[31mGEMINI_API_KEY not found\033[0m"
-            )
+            logger.error("google_search_error_001: \033[31mGEMINI_API_KEY not found\033[0m")
             return {
                 "success": False,
                 "message": "GEMINI_API_KEY not configured",
@@ -64,14 +60,10 @@ async def google_search_tool(query: str) -> dict[str, Any]:
         text = response.text
         grounding_metadata = candidate.grounding_metadata
 
-        logger.info(
-            f"google_search_003: Response received, length: \033[33m{len(text)}\033[0m chars"
-        )
+        logger.info(f"google_search_003: Response received, length: \033[33m{len(text)}\033[0m chars")
 
         if not grounding_metadata:
-            logger.info(
-                "google_search_004: No grounding metadata, answered from model knowledge"
-            )
+            logger.info("google_search_004: No grounding metadata, answered from model knowledge")
             return {
                 "success": True,
                 "query": query,
@@ -88,11 +80,7 @@ async def google_search_tool(query: str) -> dict[str, Any]:
                     sources.append(
                         {
                             "index": idx + 1,
-                            "title": (
-                                chunk.web.title
-                                if hasattr(chunk.web, "title")
-                                else "No title"
-                            ),
+                            "title": (chunk.web.title if hasattr(chunk.web, "title") else "No title"),
                             "url": chunk.web.uri if hasattr(chunk.web, "uri") else "",
                         }
                     )
@@ -114,9 +102,7 @@ async def google_search_tool(query: str) -> dict[str, Any]:
             "sources": sources,
             "search_queries": web_queries,
             "grounding_supports": (
-                len(grounding_metadata.grounding_supports)
-                if grounding_metadata.grounding_supports
-                else 0
+                len(grounding_metadata.grounding_supports) if grounding_metadata.grounding_supports else 0
             ),
         }
 

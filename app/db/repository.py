@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from sqlalchemy import select, update, desc
+from sqlalchemy import desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -24,9 +24,7 @@ async def get_or_create_conversation(
     title: str = "Walking Tour",
 ) -> ConversationORM:
     if conversation_id:
-        result = await db.execute(
-            select(ConversationORM).where(ConversationORM.id == conversation_id)
-        )
+        result = await db.execute(select(ConversationORM).where(ConversationORM.id == conversation_id))
         conv = result.scalar_one_or_none()
         if conv:
             logger.info("\033[36mCONV ›\033[0m resume  %s  \033[2m%s\033[0m", conv.id[:8], conv.title[:50])
@@ -78,7 +76,9 @@ async def save_message(
     await db.flush()
     logger.info(
         "\033[35mMSG  ›\033[0m %-9s %s  \033[2mconv:%s\033[0m",
-        role, msg.id[:8], conversation_id[:8],
+        role,
+        msg.id[:8],
+        conversation_id[:8],
     )
     return msg
 
@@ -129,7 +129,9 @@ async def get_conversation(
                 total_cost=m.total_cost,
                 input_tokens_details=InputTokensDetails(),
                 output_tokens_details=OutputTokensDetails(),
-            ) if m.model else None,
+            )
+            if m.model
+            else None,
         )
         for m in conv_orm.messages
     ]

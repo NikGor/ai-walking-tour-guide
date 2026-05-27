@@ -26,14 +26,14 @@ class PromptBuilder:
         message: str | None = None,
         language: str | None = None,
     ) -> str:
-        _LANG_NAMES = {"ru": "Russian", "en": "English", "de": "German"}
+        _lang_names = {"ru": "Russian", "en": "English", "de": "German"}
         lines = []
         if latitude is not None and longitude is not None:
             lines.append(f"Coordinates: {latitude}, {longitude}")
         if location_name:
             lines.append(f"Location name: {location_name}")
         if language and language != "auto":
-            lines.append(f"Language: {_LANG_NAMES.get(language, language)}")
+            lines.append(f"Language: {_lang_names.get(language, language)}")
         if message:
             if lines:
                 lines.append("")

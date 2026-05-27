@@ -13,7 +13,9 @@ async def reverse_geocode(lat: float, lon: float) -> str:
     params = {"lat": lat, "lon": lon, "format": "json", "zoom": 17, "addressdetails": 1}
     try:
         async with aiohttp.ClientSession(headers=_HEADERS) as session:
-            async with session.get(_NOMINATIM_URL, params=params, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+            async with session.get(
+                _NOMINATIM_URL, params=params, timeout=aiohttp.ClientTimeout(total=5)
+            ) as resp:  # noqa: E501
                 if resp.status != 200:
                     logger.warning("geo_001: Nominatim returned %d", resp.status)
                     return f"{lat:.4f}, {lon:.4f}"
@@ -24,7 +26,19 @@ async def reverse_geocode(lat: float, lon: float) -> str:
 
         # Build a concise name: POI / road, district, city, country
         parts = []
-        for key in ("tourism", "amenity", "building", "road", "pedestrian", "suburb", "city_district", "city", "town", "village", "country"):
+        for key in (
+            "tourism",
+            "amenity",
+            "building",
+            "road",
+            "pedestrian",
+            "suburb",
+            "city_district",
+            "city",
+            "town",
+            "village",
+            "country",
+        ):  # noqa: E501
             val = address.get(key)
             if val and val not in parts:
                 parts.append(val)

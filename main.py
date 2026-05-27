@@ -18,8 +18,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from alembic import command
     from alembic.config import Config
+
+    from alembic import command
+
     logger.info("=== STEP 1: App Init ===")
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.attributes["skip_logging"] = True
@@ -30,6 +32,7 @@ async def lifespan(app: FastAPI):
     tg_task = None
     if os.getenv("TELEGRAM_BOT_TOKEN"):
         from app.telegram.bot import start_polling
+
         tg_task = asyncio.create_task(start_polling())
     else:
         logger.info("\033[34mTG   ›\033[0m TELEGRAM_BOT_TOKEN not set, skipping")

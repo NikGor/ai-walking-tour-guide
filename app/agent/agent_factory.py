@@ -1,13 +1,13 @@
 import json
 import logging
 
-from app.backend.openrouter_client import OpenRouterClient
-from app.agent.prompt_builder import PromptBuilder
 from app.agent.models.models import ChatRequest, ChatResponse
-from app.agent.tools.google_search_tool import google_search_tool
+from app.agent.prompt_builder import PromptBuilder
 from app.agent.tools.google_places_search_tool import google_places_search_tool
-from app.utils.llm_parser import ParsedLLMResponse, parse_openrouter_response
+from app.agent.tools.google_search_tool import google_search_tool
+from app.backend.openrouter_client import OpenRouterClient
 from app.utils.geocoder import reverse_geocode
+from app.utils.llm_parser import ParsedLLMResponse, parse_openrouter_response
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,9 @@ class AgentFactory:
         )
 
         current_user_msg = (
-            user_message if not request.photo_url else [
+            user_message
+            if not request.photo_url
+            else [
                 {"type": "text", "text": user_message},
                 {"type": "image_url", "image_url": {"url": request.photo_url}},
             ]
@@ -134,7 +136,8 @@ class AgentFactory:
         logger.info("=== STEP 3: AI Processing ===")
         logger.info(
             "\033[35mLLM  ›\033[0m persona=\033[35m%s\033[0m  model=\033[36m%s\033[0m",
-            request.persona.value, _MODEL,
+            request.persona.value,
+            _MODEL,
         )
 
         # ── Round 1: with tools (places only if location known) ──────────────
@@ -150,18 +153,31 @@ class AgentFactory:
         tool_calls = getattr(choice.message, "tool_calls", None)
 
         if tool_calls:
-            messages.append({"role": "assistant", "content": None, "tool_calls": [
-                {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
-                for tc in tool_calls
-            ]})
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                        }
+                        for tc in tool_calls
+                    ],
+                }
+            )
 
             for tc in tool_calls:
                 args = json.loads(tc.function.arguments)
                 logger.info(
                     "\033[32mTOOL ›\033[0m \033[1m%s\033[0m  args=%s",
-                    tc.function.name, args,
+                    tc.function.name,
+                    args,
                 )
-                result = await _execute_tool(tc.function.name, args, request.latitude or 0.0, request.longitude or 0.0)
+                lat = request.latitude or 0.0
+                lon = request.longitude or 0.0
+                result = await _execute_tool(tc.function.name, args, lat, lon)
                 messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
             # ── Round 2: final answer with structured output ───────────────────
@@ -186,7 +202,9 @@ class AgentFactory:
         result: ChatResponse = parsed.parsed_content
 
         logger.info(
-            "\033[35mLLM  ›\033[0m done  words=\033[33m%d\033[0m  tokens=\033[33m%d\033[0m  \033[2m$%.4f\033[0m",
-            len(result.text.split()), parsed.llm_trace.total_tokens, parsed.llm_trace.total_cost,
+            "\033[35mLLM  ›\033[0m done  words=\033[33m%d\033[0m  tokens=\033[33m%d\033[0m  \033[2m$%.4f\033[0m",  # noqa: E501
+            len(result.text.split()),
+            parsed.llm_trace.total_tokens,
+            parsed.llm_trace.total_cost,
         )
         return parsed

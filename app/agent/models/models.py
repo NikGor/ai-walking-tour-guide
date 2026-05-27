@@ -1,25 +1,25 @@
-from datetime import datetime
-from datetime import timezone as dt_timezone
-from enum import Enum
-from typing import List, Literal, Optional
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 # ── Persona ───────────────────────────────────────────────────────────────────
 
-class Persona(str, Enum):
-    historian          = "historian"
-    dark_tourism       = "dark_tourism"
+
+class Persona(StrEnum):
+    historian = "historian"
+    dark_tourism = "dark_tourism"
     architecture_expert = "architecture_expert"
-    roman_empire       = "roman_empire"
-    ww2_context        = "ww2_context"
-    cyberpunk          = "cyberpunk"
-    storyteller        = "storyteller"
-    local_grandpa      = "local_grandpa"
+    roman_empire = "roman_empire"
+    ww2_context = "ww2_context"
+    cyberpunk = "cyberpunk"
+    storyteller = "storyteller"
+    local_grandpa = "local_grandpa"
 
 
 # ── Tour response ─────────────────────────────────────────────────────────────
+
 
 class ChatResponse(BaseModel):
     """LLM output — narrative text about the location."""
@@ -27,8 +27,8 @@ class ChatResponse(BaseModel):
     text: str
 
 
-
 # ── Content ───────────────────────────────────────────────────────────────────
+
 
 class Content(BaseModel):
     """Plain-text message content."""
@@ -37,6 +37,7 @@ class Content(BaseModel):
 
 
 # ── Token-usage models ────────────────────────────────────────────────────────
+
 
 class InputTokensDetails(BaseModel):
     """Details about input token usage."""
@@ -47,9 +48,7 @@ class InputTokensDetails(BaseModel):
 class OutputTokensDetails(BaseModel):
     """Details about output token usage."""
 
-    reasoning_tokens: int = Field(
-        default=0, description="Number of reasoning tokens generated"
-    )
+    reasoning_tokens: int = Field(default=0, description="Number of reasoning tokens generated")
 
 
 class LllmTrace(BaseModel):
@@ -72,6 +71,7 @@ class LllmTrace(BaseModel):
 
 # ── Pipeline tracing ──────────────────────────────────────────────────────────
 
+
 class PipelineStep(BaseModel):
     """Single pipeline step timing record."""
 
@@ -84,7 +84,7 @@ class StepTrace(BaseModel):
     """Timing and LLM usage data for a single pipeline stage."""
 
     duration_ms: int = Field(description="Duration of the stage in milliseconds")
-    llm_trace: Optional[LllmTrace] = Field(
+    llm_trace: LllmTrace | None = Field(
         default=None,
         description="LLM usage trace for this stage, if it involved an LLM call",
     )
@@ -99,37 +99,30 @@ class PipelineTrace(BaseModel):
 
 # ── Chat models ───────────────────────────────────────────────────────────────
 
+
 class ChatMessage(BaseModel):
     """Individual chat message in a conversation."""
 
-    message_id: Optional[str] = Field(
-        default=None, description="Unique identifier for the message"
-    )
-    role: Literal["user", "assistant", "system"] = Field(
-        description="Role of the message sender"
-    )
+    message_id: str | None = Field(default=None, description="Unique identifier for the message")
+    role: Literal["user", "assistant", "system"] = Field(description="Role of the message sender")
     content: Content = Field(description="Structured content of the message")
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(dt_timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Timestamp when the message was created",
     )
-    conversation_id: Optional[str] = Field(
+    conversation_id: str | None = Field(
         default=None, description="ID of the conversation this message belongs to"
     )
-    previous_message_id: Optional[str] = Field(
+    previous_message_id: str | None = Field(
         default=None, description="ID of the previous message for threading"
     )
-    model: Optional[str] = Field(
-        default=None, description="LLM model used to generate this message"
-    )
-    llm_trace: Optional[LllmTrace] = Field(
-        default=None, description="LLM usage trace for this message"
-    )
+    model: str | None = Field(default=None, description="LLM model used to generate this message")
+    llm_trace: LllmTrace | None = Field(default=None, description="LLM usage trace for this message")
     pipeline_steps: list[PipelineStep] = Field(
         default_factory=list,
         description="Pipeline step timings for this message",
     )
-    pipeline_trace: Optional[PipelineTrace] = Field(
+    pipeline_trace: PipelineTrace | None = Field(
         default=None,
         description="Detailed per-stage pipeline trace from the AI agent",
     )
@@ -140,70 +133,60 @@ class Conversation(BaseModel):
 
     conversation_id: str = Field(description="Unique identifier for the conversation")
     title: str = Field(default="Walking Tour", description="Title of the conversation")
-    messages: Optional[List[ChatMessage]] = Field(
+    messages: list[ChatMessage] | None = Field(
         default=None, description="List of messages in the conversation"
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(dt_timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Timestamp when the conversation was created",
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(dt_timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Timestamp when the conversation was last updated",
     )
-    llm_trace: Optional[LllmTrace] = Field(
+    llm_trace: LllmTrace | None = Field(
         default=None, description="Aggregated LLM usage trace for the conversation"
     )
-    total_input_tokens: int = Field(
-        default=0, description="Total input tokens used in this conversation"
-    )
+    total_input_tokens: int = Field(default=0, description="Total input tokens used in this conversation")
     total_output_tokens: int = Field(
         default=0, description="Total output tokens generated in this conversation"
     )
-    total_tokens: int = Field(
-        default=0, description="Total tokens used in this conversation"
-    )
-    total_cost: float = Field(
-        default=0.0, description="Total cost of this conversation in USD"
-    )
+    total_tokens: int = Field(default=0, description="Total tokens used in this conversation")
+    total_cost: float = Field(default=0.0, description="Total cost of this conversation in USD")
 
     def __init__(self, **data):
         super().__init__(**data)
         if self.messages:
             from .utils import calculate_conversation_llm_trace
+
             self.llm_trace = calculate_conversation_llm_trace(self.messages)
 
 
 # ── Request / response models ─────────────────────────────────────────────────
 
+
 class ChatRequest(BaseModel):
     """Walking tour chat request."""
 
-    latitude: Optional[float] = Field(default=None, ge=-90, le=90, description="GPS latitude")
-    longitude: Optional[float] = Field(default=None, ge=-180, le=180, description="GPS longitude")
-    photo_url: Optional[str] = Field(
-        default=None, description="Optional photo URL for scene detection"
-    )
-    persona: Persona = Field(
-        default=Persona.historian, description="Narrator persona"
-    )
+    latitude: float | None = Field(default=None, ge=-90, le=90, description="GPS latitude")
+    longitude: float | None = Field(default=None, ge=-180, le=180, description="GPS longitude")
+    photo_url: str | None = Field(default=None, description="Optional photo URL for scene detection")
+    persona: Persona = Field(default=Persona.historian, description="Narrator persona")
     response_format: Literal["plain", "markdown", "html", "ssml"] = Field(
         default="markdown", description="Format of the text content in the response"
     )
-    message: Optional[str] = Field(
+    message: str | None = Field(
         default=None,
         description="Optional user question; also determines response language",
     )
-    user_name: Optional[str] = Field(
-        default=None, description="Name of the user"
-    )
-    conversation_id: Optional[str] = Field(
+    user_name: str | None = Field(default=None, description="Name of the user")
+    conversation_id: str | None = Field(
         default=None, description="Continue an existing conversation; auto-created if absent"
     )
-    previous_message_id: Optional[str] = Field(
+    previous_message_id: str | None = Field(
         default=None, description="ID of the previous message for threading"
     )
-    language: Optional[str] = Field(
+    language: str | None = Field(
         default=None,
         description="Force response language: 'ru', 'en', 'de'. None = auto-detect from message.",
     )
@@ -212,13 +195,11 @@ class ChatRequest(BaseModel):
 class ConversationRequest(BaseModel):
     """Request model for creating a new conversation."""
 
-    conversation_id: Optional[str] = Field(
+    conversation_id: str | None = Field(
         default=None,
         description="Optional custom conversation ID. Auto-generated if not provided.",
     )
-    title: Optional[str] = Field(
-        default="Walking Tour", description="Title of the conversation"
-    )
+    title: str | None = Field(default="Walking Tour", description="Title of the conversation")
 
 
 class ConversationResponse(BaseModel):
@@ -227,23 +208,17 @@ class ConversationResponse(BaseModel):
     conversation_id: str = Field(description="ID of the created conversation")
     title: str = Field(description="Title of the conversation")
     created_at: datetime = Field(description="Timestamp when the conversation was created")
-    message: str = Field(
-        default="Conversation created successfully", description="Success message"
-    )
+    message: str = Field(default="Conversation created successfully", description="Success message")
 
 
 class ChatHistoryMessage(BaseModel):
     """Simplified message model for chat history."""
 
-    role: Literal["user", "assistant", "system"] = Field(
-        description="Role of the message sender"
-    )
+    role: Literal["user", "assistant", "system"] = Field(description="Role of the message sender")
     content: Content = Field(description="Structured content of the message")
 
 
 class ChatHistoryResponse(BaseModel):
     """Response model for chat history endpoint."""
 
-    messages: List[ChatHistoryMessage] = Field(
-        description="List of messages in the conversation"
-    )
+    messages: list[ChatHistoryMessage] = Field(description="List of messages in the conversation")

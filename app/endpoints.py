@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api_controller import handle_chat
 from app.agent.models.models import ChatMessage, ChatRequest, Conversation
+from app.api_controller import handle_chat
 from app.db.repository import get_conversation
 from app.db.session import get_db
 

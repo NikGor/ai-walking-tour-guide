@@ -1,8 +1,8 @@
 import logging
 import os
 from typing import Any
-import httpx
 
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +53,7 @@ async def google_places_search_tool(  # noqa: PLR0912
     Returns:
         Dict with place name, address, description, rating, reviews, website, Maps link
     """
-    logger.info(
-        f"google_places_001: Search requested for query: \033[36m{query}\033[0m"
-    )
+    logger.info(f"google_places_001: Search requested for query: \033[36m{query}\033[0m")
 
     # Type coercion for LLM-provided string values
     if isinstance(max_results, str):
@@ -74,9 +72,7 @@ async def google_places_search_tool(  # noqa: PLR0912
     try:
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
-            logger.error(
-                "google_places_error_001: \033[31mGOOGLE_API_KEY not found\033[0m"
-            )
+            logger.error("google_places_error_001: \033[31mGOOGLE_API_KEY not found\033[0m")
             return {
                 "success": False,
                 "message": "GOOGLE_PLACES_API_KEY not configured",
@@ -103,11 +99,7 @@ async def google_places_search_tool(  # noqa: PLR0912
                     "radius": radius_meters,
                 }
             }
-        if (
-            sort_by == "distance"
-            and location_lat is not None
-            and location_lng is not None
-        ):
+        if sort_by == "distance" and location_lat is not None and location_lng is not None:
             payload["rankPreference"] = "DISTANCE"
         elif sort_by == "relevance":
             payload["rankPreference"] = "RELEVANCE"

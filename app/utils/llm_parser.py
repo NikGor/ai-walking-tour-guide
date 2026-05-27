@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.agent.models.models import (
     InputTokensDetails,
@@ -18,14 +18,15 @@ logger = logging.getLogger(__name__)
 # Prices in USD per 1 000 000 tokens (input / output).
 # Prefix matching is used for versioned names (e.g. gpt-4.1-2025-04-14).
 MODEL_TOKEN_PRICES: dict[str, dict[str, float]] = {
-    "openai/gpt-4.1":     {"input": 2.00, "output": 8.00},
-    "gpt-4.1":            {"input": 2.00, "output": 8.00},
-    "openai/gpt-4o":      {"input": 2.50, "output": 10.00},
+    "openai/gpt-4.1": {"input": 2.00, "output": 8.00},
+    "gpt-4.1": {"input": 2.00, "output": 8.00},
+    "openai/gpt-4o": {"input": 2.50, "output": 10.00},
     "openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
 }
 
 
 # ── Result wrapper ────────────────────────────────────────────────────────────
+
 
 class ParsedLLMResponse(BaseModel):
     """Parsed response from an LLM provider."""
@@ -39,6 +40,7 @@ class ParsedLLMResponse(BaseModel):
 
 # ── Cost helper ───────────────────────────────────────────────────────────────
 
+
 def calculate_token_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     """Return cost in USD for the given token counts.
 
@@ -50,12 +52,11 @@ def calculate_token_cost(model: str, input_tokens: int, output_tokens: int) -> f
     )
     if prices is None:
         return 0.0
-    return (input_tokens / 1_000_000) * prices["input"] + (
-        output_tokens / 1_000_000
-    ) * prices["output"]
+    return (input_tokens / 1_000_000) * prices["input"] + (output_tokens / 1_000_000) * prices["output"]
 
 
 # ── OpenRouter parser ─────────────────────────────────────────────────────────
+
 
 def parse_openrouter_response(
     raw_response: Any,
@@ -69,11 +70,11 @@ def parse_openrouter_response(
     logger.info("llm_parser_001: Parsing OpenRouter response")
 
     usage = raw_response.usage
-    input_tokens  = getattr(usage, "prompt_tokens",     0) or 0 if usage else 0
+    input_tokens = getattr(usage, "prompt_tokens", 0) or 0 if usage else 0
     output_tokens = getattr(usage, "completion_tokens", 0) or 0 if usage else 0
-    total_tokens  = getattr(usage, "total_tokens",      0) or 0 if usage else 0
+    total_tokens = getattr(usage, "total_tokens", 0) or 0 if usage else 0
 
-    prompt_details     = getattr(usage, "prompt_tokens_details",     None) if usage else None
+    prompt_details = getattr(usage, "prompt_tokens_details", None) if usage else None
     completion_details = getattr(usage, "completion_tokens_details", None) if usage else None
 
     model = raw_response.model or "unknown"
@@ -94,7 +95,10 @@ def parse_openrouter_response(
     logger.info(
         "llm_parser_002: cost=\033[33m$%.6f\033[0m "
         "in=\033[33m%d\033[0m out=\033[33m%d\033[0m model=\033[36m%s\033[0m",
-        llm_trace.total_cost, input_tokens, output_tokens, model,
+        llm_trace.total_cost,
+        input_tokens,
+        output_tokens,
+        model,
     )
 
     if not raw_response.choices:

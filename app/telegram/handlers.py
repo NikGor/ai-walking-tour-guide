@@ -4,14 +4,14 @@ import os
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import (
+    CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
     Message,
-    CallbackQuery,
     ReplyKeyboardMarkup,
 )
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from app.agent.models.models import ChatRequest, Persona
 from app.api_controller import handle_chat
@@ -33,21 +33,21 @@ _location_kb = ReplyKeyboardMarkup(
 )
 
 _PERSONA_LABELS = {
-    Persona.historian:           "📜 Историк",
-    Persona.dark_tourism:        "💀 Тёмный туризм",
+    Persona.historian: "📜 Историк",
+    Persona.dark_tourism: "💀 Тёмный туризм",
     Persona.architecture_expert: "🏛 Архитектор",
-    Persona.roman_empire:        "⚔️ Римская империя",
-    Persona.ww2_context:         "🪖 Вторая мировая",
-    Persona.cyberpunk:           "🤖 Киберпанк",
-    Persona.storyteller:         "🎭 Сказитель",
-    Persona.local_grandpa:       "👴 Местный дед",
+    Persona.roman_empire: "⚔️ Римская империя",
+    Persona.ww2_context: "🪖 Вторая мировая",
+    Persona.cyberpunk: "🤖 Киберпанк",
+    Persona.storyteller: "🎭 Сказитель",
+    Persona.local_grandpa: "👴 Местный дед",
 }
 
 _LANG_LABELS = {
     "auto": "🌐 Авто (по сообщению)",
-    "ru":   "🇷🇺 Русский",
-    "en":   "🇬🇧 English",
-    "de":   "🇩🇪 Deutsch",
+    "ru": "🇷🇺 Русский",
+    "en": "🇬🇧 English",
+    "de": "🇩🇪 Deutsch",
 }
 
 
@@ -55,10 +55,14 @@ def _modes_kb(current: Persona) -> InlineKeyboardMarkup:
     buttons = []
     for persona, label in _PERSONA_LABELS.items():
         check = "✅ " if persona == current else ""
-        buttons.append([InlineKeyboardButton(
-            text=f"{check}{label}",
-            callback_data=f"mode:{persona.value}",
-        )])
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{check}{label}",
+                    callback_data=f"mode:{persona.value}",
+                )
+            ]
+        )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -66,10 +70,14 @@ def _lang_kb(current: str) -> InlineKeyboardMarkup:
     buttons = []
     for lang, label in _LANG_LABELS.items():
         check = "✅ " if lang == current else ""
-        buttons.append([InlineKeyboardButton(
-            text=f"{check}{label}",
-            callback_data=f"lang:{lang}",
-        )])
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{check}{label}",
+                    callback_data=f"lang:{lang}",
+                )
+            ]
+        )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -93,6 +101,7 @@ _HELP = (
 
 
 # ── Command handlers ──────────────────────────────────────────────────────────
+
 
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
@@ -148,9 +157,7 @@ async def cmd_new(message: Message) -> None:
 async def cmd_history(message: Message) -> None:
     chat_id = message.chat.id
     async with AsyncSessionLocal() as db:
-        conv_result = await db.execute(
-            select(ConversationORM).where(ConversationORM.id == str(chat_id))
-        )
+        conv_result = await db.execute(select(ConversationORM).where(ConversationORM.id == str(chat_id)))
         conv = conv_result.scalar_one_or_none()
 
         user_msg_count = 0
@@ -205,6 +212,7 @@ async def cmd_settings(message: Message) -> None:
 
 # ── Callbacks ─────────────────────────────────────────────────────────────────
 
+
 @router.callback_query(F.data.startswith("mode:"))
 async def cb_mode(callback: CallbackQuery) -> None:
     chat_id = callback.message.chat.id
@@ -233,6 +241,7 @@ async def cb_lang(callback: CallbackQuery) -> None:
 
 # ── Location & text ───────────────────────────────────────────────────────────
 
+
 @router.message(F.location)
 async def handle_location(message: Message) -> None:
     chat_id = message.chat.id
@@ -245,7 +254,9 @@ async def handle_location(message: Message) -> None:
 
     logger.info(
         "\033[34mTG   ›\033[0m location  chat=\033[36m%d\033[0m  lat=%.4f lon=%.4f",
-        chat_id, lat, lon,
+        chat_id,
+        lat,
+        lon,
     )
     await _dispatch(message, lat=lat, lon=lon, user_message=None)
 
@@ -260,6 +271,7 @@ async def handle_photo(message: Message) -> None:
 
     photo = message.photo[-1]
     from app.telegram.bot import get_bot
+
     bot = get_bot()
     file = await bot.get_file(photo.file_id)
     token = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -268,10 +280,12 @@ async def handle_photo(message: Message) -> None:
 
     logger.info(
         "\033[34mTG   ›\033[0m photo  chat=\033[36m%d\033[0m  file=%s",
-        chat_id, file.file_path,
+        chat_id,
+        file.file_path,
     )
-    await _dispatch(message, lat=session["lat"], lon=session["lon"],
-                    user_message=caption, photo_url=photo_url)
+    await _dispatch(
+        message, lat=session["lat"], lon=session["lon"], user_message=caption, photo_url=photo_url
+    )
 
 
 @router.message(F.text)
@@ -288,6 +302,7 @@ async def handle_text(message: Message) -> None:
 
 
 # ── Core dispatch ─────────────────────────────────────────────────────────────
+
 
 async def _dispatch(
     message: Message,
