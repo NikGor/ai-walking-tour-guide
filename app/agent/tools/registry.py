@@ -28,7 +28,12 @@ _TOOLS: list[dict] = [
                     "items": {"type": "string"},
                     "description": (
                         "List of 8–12 attraction names. "
-                        "Use well-known local or English names, e.g. 'Colosseum', 'Piazza Navona'. "
+                        "CRITICAL: use the OFFICIAL LOCAL NAME as it appears on OpenStreetMap — "
+                        "German for German cities, Italian for Italian, French for French, etc. "
+                        "NEVER translate: use 'Schloss Bad Mergentheim', NOT 'Замок Бад-Мергентхайм'. "
+                        "Use 'Marktplatz', NOT 'Площадь Marktplatz'. "
+                        "Use 'Colosseum' or 'Colosseo', NOT 'Колизей'. "
+                        "Do NOT add generic translated prefixes like 'площадь', 'замок', 'церковь'. "
                         "Do NOT include addresses — just the attraction name."
                     ),
                     "minItems": 3,

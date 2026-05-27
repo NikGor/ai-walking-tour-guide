@@ -27,23 +27,37 @@ _VISIT_MINUTES = 45  # default time at each stop
 # ── Geocoding ──────────────────────────────────────────────────────────────────
 
 
-async def _geocode_one(client: httpx.AsyncClient, name: str, city: str) -> dict | None:
+async def _nominatim_search(client: httpx.AsyncClient, query: str) -> dict | None:
+    """Single Nominatim search, returns first hit or None."""
     try:
         resp = await client.get(
             _NOMINATIM_URL,
-            params={"q": f"{name}, {city}", "format": "json", "limit": 1, "addressdetails": 0},
+            params={"q": query, "format": "json", "limit": 1, "addressdetails": 0},
             headers={"User-Agent": "SolarisPliny/1.0 (walking-tour-guide)"},
             timeout=10.0,
         )
         data = resp.json()
         if data:
-            return {
-                "name": name,
-                "lat": float(data[0]["lat"]),
-                "lon": float(data[0]["lon"]),
-            }
+            return {"lat": float(data[0]["lat"]), "lon": float(data[0]["lon"])}
     except Exception as e:
-        logger.warning("tour_geo_warn: failed to geocode %r in %r: %s", name, city, e)
+        logger.warning("tour_geo_warn: query=%r  error=%s", query, e)
+    return None
+
+
+async def _geocode_one(client: httpx.AsyncClient, name: str, city: str) -> dict | None:
+    """Try two strategies: '{name}, {city}' then '{name}' alone."""
+    # Strategy 1: name + city (precise)
+    hit = await _nominatim_search(client, f"{name}, {city}")
+    if hit:
+        return {"name": name, **hit}
+
+    # Strategy 2: name only (broader — works for unique landmarks)
+    await asyncio.sleep(1.1)  # extra rate-limit pause for the retry
+    hit = await _nominatim_search(client, name)
+    if hit:
+        logger.info("tour_geo_fallback: %r found via name-only search", name)
+        return {"name": name, **hit}
+
     return None
 
 
