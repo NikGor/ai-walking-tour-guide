@@ -12,6 +12,8 @@ class Persona(StrEnum):
     architecture_expert = "architecture_expert"
     roman_empire = "roman_empire"
     storyteller = "storyteller"
+    medieval_resident = "medieval_resident"
+    military_expert = "military_expert"
 
 
 # ── Tour response ─────────────────────────────────────────────────────────────

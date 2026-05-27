@@ -76,6 +76,8 @@ _PERSONA_LABELS = {
     Persona.architecture_expert: "🏛 Архитектор",
     Persona.roman_empire: "⚔️ Римская империя",
     Persona.storyteller: "🎭 Сказитель",
+    Persona.medieval_resident: "🏚 Житель средних веков",
+    Persona.military_expert: "🗡 Военный историк",
 }
 
 _LANG_LABELS = {
