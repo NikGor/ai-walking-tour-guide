@@ -917,10 +917,25 @@
 
   function downloadImage() {
     const r = state.lastResult;
-    const link = document.createElement('a');
-    link.href = `data:${r.image_mime};base64,${r.image_data}`;
-    link.download = `time_travel_${r.era_label}.jpg`;
-    link.click();
+    // Convert base64 → Blob → object URL to reliably download large images
+    // (data: URI downloads silently fail in many browsers above ~2 MB)
+    try {
+      const bytes = atob(r.image_data);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      const blob = new Blob([arr], { type: r.image_mime || 'image/jpeg' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const safeName = (r.era_label || 'result').replace(/[^\w\-\.]/g, '_');
+      link.download = `time_travel_${safeName}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      showError(`Не удалось скачать: ${e.message}`);
+    }
   }
 
   async function sendToChat() {

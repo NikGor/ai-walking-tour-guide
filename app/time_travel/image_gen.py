@@ -188,7 +188,15 @@ def _extract_image_from_response(response: object) -> tuple[str | None, str]:
             logger.warning("time_travel_img_008: No candidates in response")
             return None, ""
 
-        for part in candidates[0].content.parts:
+        content = getattr(candidates[0], "content", None)
+        if not content or not getattr(content, "parts", None):
+            logger.warning(
+                "time_travel_img_008b: candidate has no content/parts "
+                "(likely safety filter or empty response)"
+            )
+            return None, ""
+
+        for part in content.parts:
             inline = getattr(part, "inline_data", None)
             if inline and getattr(inline, "data", None):
                 data = inline.data
