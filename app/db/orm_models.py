@@ -53,6 +53,7 @@ class UserSettingsORM(Base):
     chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     persona: Mapped[str] = mapped_column(String(50), default="historian")
     lang: Mapped[str] = mapped_column(String(10), default="auto")
+    fmt: Mapped[str] = mapped_column(String(20), default="html")
     lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     lon: Mapped[float | None] = mapped_column(Float, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)

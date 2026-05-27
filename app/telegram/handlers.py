@@ -21,10 +21,15 @@ from app.db.orm_models import ConversationORM, MessageORM
 from app.db.repository import get_user_settings, upsert_user_settings
 from app.db.session import AsyncSessionLocal
 
-_PARSE_MODE: ParseMode | None = {
+_PARSE_MODES: dict[str, ParseMode] = {
     "html": ParseMode.HTML,
     "markdown": ParseMode.MARKDOWN,
-}.get(RESPONSE_FORMAT)
+}
+
+
+def _parse_mode(fmt: str) -> ParseMode | None:
+    return _PARSE_MODES.get(fmt)
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +57,7 @@ async def _persist_session(chat_id: int) -> None:
             chat_id=chat_id,
             persona=s.get("persona", "historian"),
             lang=s.get("lang", "auto"),
+            fmt=s.get("fmt", RESPONSE_FORMAT),
             lat=s.get("lat"),
             lon=s.get("lon"),
         )
@@ -114,6 +120,21 @@ def _lang_kb(current: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+_FMT_LABELS = {
+    "html": "📄 HTML (рекомендуется)",
+    "markdown": "✏️ Markdown",
+    "plain": "📝 Простой текст",
+}
+
+
+def _fmt_kb(current: str) -> InlineKeyboardMarkup:
+    buttons = []
+    for fmt, label in _FMT_LABELS.items():
+        check = "✅ " if fmt == current else ""
+        buttons.append([InlineKeyboardButton(text=f"{check}{label}", callback_data=f"fmt:{fmt}")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 # ── Help text ─────────────────────────────────────────────────────────────────
 
 _HELP = (
@@ -126,6 +147,7 @@ _HELP = (
     "/whereami — история текущего места\n"
     "/modes — стиль рассказа\n"
     "/lang — язык ответов\n"
+    "/fmt — формат текста (HTML / Markdown)\n"
     "/new — начать новый разговор\n"
     "/history — статистика сессии\n"
     "/settings — все настройки\n"
@@ -170,6 +192,14 @@ async def cmd_lang(message: Message) -> None:
     session = await _get_session(chat_id)
     lang = session.get("lang", "auto")
     await message.answer("Выбери язык ответов:", reply_markup=_lang_kb(lang))
+
+
+@router.message(Command("fmt"))
+async def cmd_fmt(message: Message) -> None:
+    chat_id = message.chat.id
+    session = await _get_session(chat_id)
+    fmt = session.get("fmt", RESPONSE_FORMAT)
+    await message.answer("Выбери формат текста:", reply_markup=_fmt_kb(fmt))
 
 
 @router.message(Command("new"))
@@ -229,16 +259,17 @@ async def cmd_settings(message: Message) -> None:
     lat = session.get("lat")
     lon = session.get("lon")
 
+    fmt = session.get("fmt", RESPONSE_FORMAT)
     location_str = f"{lat:.4f}, {lon:.4f}" if lat else "не задана"
     lines = [
         "⚙️ <b>Настройки</b>",
         f"🎭 Стиль: <b>{_PERSONA_LABELS[persona]}</b>",
         f"🌐 Язык: <b>{_LANG_LABELS[lang]}</b>",
+        f"📄 Формат: <b>{_FMT_LABELS.get(fmt, fmt)}</b>",
         f"📍 Последняя локация: <code>{location_str}</code>",
         f"🆔 Chat ID: <code>{chat_id}</code>",
         "",
-        "/modes — сменить стиль",
-        "/lang — сменить язык",
+        "/modes — стиль  •  /lang — язык  •  /fmt — формат",
         "/new — начать новый разговор",
     ]
     await message.answer("\n".join(lines))
@@ -273,6 +304,22 @@ async def cb_lang(callback: CallbackQuery) -> None:
     await callback.message.edit_text(
         f"✅ Язык: <b>{label}</b>",
         reply_markup=None,
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("fmt:"))
+async def cb_fmt(callback: CallbackQuery) -> None:
+    chat_id = callback.message.chat.id
+    fmt = callback.data.split(":", 1)[1]
+    session = await _get_session(chat_id)
+    session["fmt"] = fmt
+    await _persist_session(chat_id)
+    label = _FMT_LABELS[fmt]
+    await callback.message.edit_text(
+        f"✅ Формат: <b>{label}</b>",
+        reply_markup=None,
+        parse_mode=ParseMode.HTML,
     )
     await callback.answer()
 
@@ -354,6 +401,7 @@ async def _dispatch(
     session = await _get_session(chat_id)
     persona = Persona(session.get("persona", Persona.historian))
     lang = session.get("lang", "auto")
+    fmt = session.get("fmt", RESPONSE_FORMAT)
 
     request = ChatRequest(
         latitude=lat,
@@ -364,7 +412,7 @@ async def _dispatch(
         conversation_id=str(chat_id),
         user_name=message.from_user.first_name if message.from_user else None,
         language=None if lang == "auto" else lang,
-        response_format=RESPONSE_FORMAT,
+        response_format=fmt,
     )
 
     thinking = await message.answer("⏳")
@@ -378,4 +426,4 @@ async def _dispatch(
         reply = f"⚠️ Ошибка: {e}"
 
     await thinking.delete()
-    await message.answer(reply, parse_mode=_PARSE_MODE)
+    await message.answer(reply, parse_mode=_parse_mode(fmt))
