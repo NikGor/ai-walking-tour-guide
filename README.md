@@ -1,5 +1,8 @@
 # Solaris Pliny
 
+[![CI](https://github.com/NikGor/ai-walking-tour-guide/actions/workflows/ci.yml/badge.svg)](https://github.com/NikGor/ai-walking-tour-guide/actions/workflows/ci.yml)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/ai-walking-tour-guide)
+
 **AI walking tour guide** named after Pliny the Elder — the Roman historian who spent his life documenting the world around him.
 
 Send a GPS location (and optionally a photo) and get a historically grounded narrative about the exact building, square, or street in front of you. No hallucination, no general city history — the story of *this* specific place.
