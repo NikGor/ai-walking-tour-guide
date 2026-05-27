@@ -16,66 +16,11 @@ _agent = AgentFactory()
 
 
 def _render(result: ChatResponse, fmt: str) -> str:
-    """Render a structured ChatResponse into the requested text format."""
-    if fmt == "plain":
-        return _render_plain(result)
     if fmt == "html":
-        return _render_html(result)
+        return f"<h1>{result.title}</h1>\n<p>{result.text}</p>"
     if fmt == "ssml":
-        return _render_ssml(result)
-    return _render_markdown(result)
-
-
-def _render_markdown(result: ChatResponse) -> str:
-    lines = [f"# {result.title}", "", result.summary, "", result.history]
-    if result.facts:
-        lines += ["", "## Факты"]
-        lines += [f"- {f}" for f in result.facts]
-    if result.timeline:
-        lines += ["", "## Хронология"]
-        lines += [f"- **{e.year}** — {e.event}" for e in result.timeline]
-    if result.related_people:
-        lines += ["", f"**Люди:** {', '.join(result.related_people)}"]
-    if result.sources:
-        lines += ["", "## Источники"]
-        lines += [f"- {s}" for s in result.sources]
-    lines += ["", f"*Достоверность: {result.confidence:.0%}*"]
-    return "\n".join(lines)
-
-
-def _render_plain(result: ChatResponse) -> str:
-    lines = [result.title, "", result.summary, "", result.history]
-    if result.facts:
-        lines += ["", "Факты:"]
-        lines += [f"  • {f}" for f in result.facts]
-    if result.timeline:
-        lines += ["", "Хронология:"]
-        lines += [f"  {e.year}: {e.event}" for e in result.timeline]
-    if result.related_people:
-        lines += ["", f"Связанные люди: {', '.join(result.related_people)}"]
-    lines += ["", f"Достоверность: {result.confidence:.0%}"]
-    return "\n".join(lines)
-
-
-def _render_html(result: ChatResponse) -> str:
-    parts = [f"<h1>{result.title}</h1>", f"<p>{result.summary}</p>", f"<p>{result.history}</p>"]
-    if result.facts:
-        items = "".join(f"<li>{f}</li>" for f in result.facts)
-        parts.append(f"<h2>Факты</h2><ul>{items}</ul>")
-    if result.timeline:
-        items = "".join(f"<li><strong>{e.year}</strong> — {e.event}</li>" for e in result.timeline)
-        parts.append(f"<h2>Хронология</h2><ul>{items}</ul>")
-    if result.related_people:
-        parts.append(f"<p><strong>Люди:</strong> {', '.join(result.related_people)}</p>")
-    parts.append(f"<p><em>Достоверность: {result.confidence:.0%}</em></p>")
-    return "\n".join(parts)
-
-
-def _render_ssml(result: ChatResponse) -> str:
-    text = f"{result.title}. {result.summary} {result.history}"
-    if result.related_people:
-        text += f" Связанные люди: {', '.join(result.related_people)}."
-    return f"<speak><p>{text}</p></speak>"
+        return f"<speak><p>{result.title}. {result.text}</p></speak>"
+    return result.text
 
 
 def _user_content_text(request: ChatRequest) -> str:
@@ -88,8 +33,7 @@ def _user_content_text(request: ChatRequest) -> str:
 async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
     logger.info("=== STEP 2: Chat Request ===")
     logger.info(
-        "controller_001: lat=\033[33m%.4f\033[0m lon=\033[33m%.4f\033[0m "
-        "persona=\033[35m%s\033[0m fmt=\033[36m%s\033[0m",
+        "\033[33mREQ  ›\033[0m lat=%.4f lon=%.4f  persona=\033[35m%s\033[0m  fmt=\033[36m%s\033[0m",
         request.latitude, request.longitude, request.persona.value, request.response_format,
     )
 
@@ -131,7 +75,7 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
 
     logger.info("=== STEP 4: Response Ready ===")
     logger.info(
-        "controller_002: title=\033[32m%r\033[0m confidence=\033[33m%.2f\033[0m conv=\033[36m%s\033[0m",
-        result.title, result.confidence, conv.id,
+        "\033[32mRESP ›\033[0m \033[1m%s\033[0m  \033[2mconv:%s\033[0m",
+        result.title, conv.id[:8],
     )
     return message

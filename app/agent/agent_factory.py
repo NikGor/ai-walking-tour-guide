@@ -31,8 +31,7 @@ class AgentFactory:
         )
 
         logger.info("=== STEP 3: AI Processing ===")
-        logger.info("agent_001: Persona: \033[35m%s\033[0m", request.persona.value)
-        logger.info("agent_002: Calling \033[36m%s\033[0m", _MODEL)
+        logger.info("\033[35mLLM  ›\033[0m persona=\033[35m%s\033[0m  model=\033[36m%s\033[0m", request.persona.value, _MODEL)
 
         raw = await self._client.create_completion(
             messages=[
@@ -47,7 +46,7 @@ class AgentFactory:
         result: ChatResponse = parsed.parsed_content
 
         logger.info(
-            "agent_003: words=\033[33m%d\033[0m confidence=\033[33m%.2f\033[0m",
-            len(result.history.split()), result.confidence,
+            "\033[35mLLM  ›\033[0m done  words=\033[33m%d\033[0m  tokens=\033[33m%d\033[0m  \033[2m$%.4f\033[0m",
+            len(result.text.split()), parsed.llm_trace.total_tokens, parsed.llm_trace.total_cost,
         )
         return parsed

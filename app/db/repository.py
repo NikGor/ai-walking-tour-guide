@@ -29,7 +29,7 @@ async def get_or_create_conversation(
         )
         conv = result.scalar_one_or_none()
         if conv:
-            logger.info("db_001: Resuming conversation \033[36m%s\033[0m", conv.id)
+            logger.info("\033[36mCONV ›\033[0m resume  %s  \033[2m%s\033[0m", conv.id[:8], conv.title[:50])
             return conv
 
     conv = ConversationORM(
@@ -38,7 +38,7 @@ async def get_or_create_conversation(
     )
     db.add(conv)
     await db.flush()
-    logger.info("db_002: Created conversation \033[36m%s\033[0m", conv.id)
+    logger.info("\033[36mCONV ›\033[0m new      %s  \033[2m%s\033[0m", conv.id[:8], conv.title[:50])
     return conv
 
 
@@ -77,8 +77,8 @@ async def save_message(
 
     await db.flush()
     logger.info(
-        "db_003: Saved \033[35m%s\033[0m message \033[36m%s\033[0m",
-        role, msg.id,
+        "\033[35mMSG  ›\033[0m %-9s %s  \033[2mconv:%s\033[0m",
+        role, msg.id[:8], conversation_id[:8],
     )
     return msg
 

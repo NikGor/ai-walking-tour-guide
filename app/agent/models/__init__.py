@@ -15,7 +15,6 @@ from .models import (
     PipelineStep,
     PipelineTrace,
     StepTrace,
-    TimelineEvent,
 )
 
 __all__ = [
@@ -35,5 +34,4 @@ __all__ = [
     "PipelineStep",
     "PipelineTrace",
     "StepTrace",
-    "TimelineEvent",
 ]

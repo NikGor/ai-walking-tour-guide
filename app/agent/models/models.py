@@ -21,22 +21,11 @@ class Persona(str, Enum):
 
 # ── Tour response ─────────────────────────────────────────────────────────────
 
-class TimelineEvent(BaseModel):
-    year: str
-    event: str
-
-
 class ChatResponse(BaseModel):
-    """Structured LLM output — the walking tour narrative."""
+    """LLM output — location title and narrative text."""
 
     title: str
-    summary: str
-    history: str
-    facts: list[str]
-    timeline: list[TimelineEvent]
-    related_people: list[str]
-    sources: list[str]
-    confidence: float = Field(..., ge=0.0, le=1.0)
+    text: str
 
 
 
