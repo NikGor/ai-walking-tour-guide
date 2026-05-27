@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Any, cast
 
 from app.agent.models.models import ChatRequest, ChatResponse
 from app.agent.prompt_builder import PromptBuilder
@@ -103,6 +104,7 @@ class AgentFactory:
 
         location_name: str | None = None
         if has_location:
+            assert request.latitude is not None and request.longitude is not None
             logger.info("=== STEP 2.5: Geocode ===")
             location_name = await reverse_geocode(request.latitude, request.longitude)
 
@@ -124,7 +126,7 @@ class AgentFactory:
             ]
         )
 
-        messages = [{"role": "system", "content": system_prompt}]
+        messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
         if history:
             messages.extend(history)
             logger.info(
@@ -199,7 +201,7 @@ class AgentFactory:
             )
 
         parsed = parse_openrouter_response(raw, ChatResponse)
-        result: ChatResponse = parsed.parsed_content
+        result = cast(ChatResponse, parsed.parsed_content)
 
         logger.info(
             "\033[35mLLM  ›\033[0m done  words=\033[33m%d\033[0m  tokens=\033[33m%d\033[0m  \033[2m$%.4f\033[0m",  # noqa: E501
