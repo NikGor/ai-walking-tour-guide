@@ -691,6 +691,7 @@ async def _dispatch(
     thinking = await message.answer("⏳")
 
     map_image: bytes | None = None
+    conv_id = str(chat_id)
     try:
         async with AsyncSessionLocal() as db:
             response = await handle_chat(request, db)
@@ -705,6 +706,16 @@ async def _dispatch(
         reply = f"⚠️ Ошибка: {e}"
         suggestions = []
         recommended_personas = []
+        # Save error to DB so the conversation history is complete
+        try:
+            async with AsyncSessionLocal() as db:
+                from app.db.repository import get_or_create_conversation, save_message
+
+                conv = await get_or_create_conversation(db, conv_id)
+                await save_message(db, conversation_id=conv.id, role="assistant", content_text=reply)
+                await db.commit()
+        except Exception:
+            logger.warning("TG dispatch: failed to save error message to DB", exc_info=True)
 
     has_buttons = bool(suggestions) or bool(recommended_personas)
     # No location yet → show the persistent location keyboard so user can share.

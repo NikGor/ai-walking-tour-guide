@@ -55,22 +55,25 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
             request.response_format,
         )
 
-    # ── DB: get or create conversation, load history ──────────────────────────
+    # ── DB: get or create conversation ────────────────────────────────────────
     conv = await get_or_create_conversation(db, request.conversation_id, title=_conv_title(request))
     history = await get_recent_messages(db, conv.id, limit=12)
 
-    parsed_result = await _agent.run(request, history=history)
-    result: ChatResponse = parsed_result.parsed_content
-
-    # ── Save user message ──────────────────────────────────────────────────────
+    # ── Save user message BEFORE running the agent ────────────────────────────
+    # Saved early so it's persisted even if the LLM call fails.
     await save_message(
         db,
         conversation_id=conv.id,
         role="user",
         content_text=_user_content_text(request),
     )
+    await db.commit()
 
-    # ── Save assistant message ─────────────────────────────────────────────────
+    # ── Run the agent ─────────────────────────────────────────────────────────
+    parsed_result = await _agent.run(request, history=history)
+    result: ChatResponse = parsed_result.parsed_content
+
+    # ── Save assistant message ────────────────────────────────────────────────
     content_text = _render(result, request.response_format)
     await save_message(
         db,
@@ -81,7 +84,6 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
         model=parsed_result.llm_trace.model,
         suggestions=result.suggestions or None,
     )
-
     await db.commit()
 
     message = ChatMessage(
