@@ -12,7 +12,8 @@ load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    format="%(asctime)s - %(message)s",
+    datefmt="%H:%M:%S",
 )
 
 from app.api_controller import handle_chat
