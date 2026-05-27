@@ -263,6 +263,7 @@ _HELP = (
     "<b>Команды:</b>\n"
     "/whereami — история текущего места\n"
     "/continue — продолжить рассказ\n"
+    "/tour — пешеходный тур по городу 🗺\n"
     "/modes — стиль рассказа\n"
     "/lang — язык ответов\n"
     "/fmt — формат текста (HTML / Markdown)\n"
@@ -310,6 +311,53 @@ async def cmd_continue(message: Message) -> None:
         lon=session["lon"],
         user_message="Продолжи рассказ",
     )
+
+
+@router.message(Command("tour"))
+async def cmd_tour(message: Message) -> None:
+    """Plan a walking city tour.
+
+    - With GPS location: ask the LLM to determine the city from coordinates and plan a tour.
+    - Without GPS (or with city name in command): use the provided city name or session context.
+
+    Usage: /tour          — uses current GPS location to determine city
+           /tour Rome     — explicit city name
+           /tour Рим      — also works
+    """
+    chat_id = message.chat.id
+    session = await _get_session(chat_id)
+
+    # Extract optional city argument from the command, e.g. "/tour Rome" → "Rome"
+    text = (message.text or "").strip()
+    # Strip "/tour" prefix and any bot username (@username)
+    parts = text.split(None, 1)
+    city_arg = parts[1].strip() if len(parts) > 1 else None
+
+    lat = session.get("lat")
+    lon = session.get("lon")
+
+    if city_arg:
+        # City name provided explicitly in the command
+        user_message = (
+            f"Составь пешеходный тур на целый день по городу {city_arg}. Используй инструмент plan_city_tour."
+        )
+        await _dispatch(message, lat=lat, lon=lon, user_message=user_message)
+    elif lat is not None and lon is not None:
+        # Use GPS — LLM will resolve city from coordinates
+        user_message = (
+            "Составь пешеходный тур на целый день по этому городу. "
+            "Определи город по координатам и используй инструмент plan_city_tour."
+        )
+        await _dispatch(message, lat=lat, lon=lon, user_message=user_message)
+    else:
+        await message.answer(
+            "🗺 <b>Тур по городу</b>\n\n"
+            "Отправь локацию 📍 чтобы я определил город автоматически, "
+            "или укажи город явно:\n\n"
+            "<code>/tour Рим</code>\n"
+            "<code>/tour Saint Petersburg</code>",
+            reply_markup=_location_markup(),
+        )
 
 
 @router.message(Command("modes"))

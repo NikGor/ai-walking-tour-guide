@@ -39,6 +39,7 @@ async def start_polling() -> None:
         [
             BotCommand(command="whereami", description="История текущего места"),
             BotCommand(command="continue", description="Продолжить рассказ"),
+            BotCommand(command="tour", description="Пешеходный тур по городу 🗺"),
             BotCommand(command="modes", description="Стиль рассказа (персона)"),
             BotCommand(command="lang", description="Язык ответов"),
             BotCommand(command="fmt", description="Формат текста (HTML / Markdown)"),
