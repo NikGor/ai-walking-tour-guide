@@ -1,5 +1,7 @@
+import json
 import logging
 import os
+from pathlib import Path
 
 from aiogram import F, Router
 from aiogram.enums import ParseMode
@@ -21,6 +23,10 @@ from app.config import RESPONSE_FORMAT
 from app.db.orm_models import ConversationORM, MessageORM
 from app.db.repository import get_user_settings, upsert_user_settings
 from app.db.session import AsyncSessionLocal
+
+# ── Debug mode ────────────────────────────────────────────────────────────────
+
+DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() in ("1", "true", "yes")
 
 _PARSE_MODES: dict[str, ParseMode] = {
     "html": ParseMode.HTML,
@@ -81,6 +87,50 @@ else:
     _kb_row = [_location_button]
 
 _location_kb = ReplyKeyboardMarkup(keyboard=[_kb_row], resize_keyboard=True, is_persistent=True)
+
+# ── Debug samples keyboard ────────────────────────────────────────────────────
+
+_SAMPLES_PATH = Path(__file__).parent.parent.parent / "samples" / "requests.json"
+
+_SAMPLE_LABELS = [
+    "🏛 Ватикан",
+    "🌉 Tower Bridge",
+    "🎨 Монмартр",
+    "🗼 Эйфелева башня",
+    "🖼 Лувр",
+    "⚔️ Колизей",
+    "👑 Букингемский",
+    "🏛 Парламент",
+]
+
+
+def _load_samples() -> list[dict]:
+    if not _SAMPLES_PATH.exists():
+        logger.warning("debug: samples/requests.json not found at %s", _SAMPLES_PATH)
+        return []
+    with _SAMPLES_PATH.open(encoding="utf-8") as f:
+        return json.load(f)
+
+
+_SAMPLES: list[dict] = _load_samples() if DEBUG_MODE else []
+
+
+def _debug_kb() -> InlineKeyboardMarkup:
+    """2-column inline keyboard with sample locations (debug mode only)."""
+    rows = []
+    for i in range(0, len(_SAMPLES), 2):
+        row = []
+        for j in range(i, min(i + 2, len(_SAMPLES))):
+            label = _SAMPLE_LABELS[j] if j < len(_SAMPLE_LABELS) else f"Sample {j}"
+            row.append(InlineKeyboardButton(text=label, callback_data=f"sample:{j}"))
+        rows.append(row)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _location_markup() -> InlineKeyboardMarkup | ReplyKeyboardMarkup:
+    """Return debug sample buttons or the real location keyboard depending on DEBUG_MODE."""
+    return _debug_kb() if DEBUG_MODE else _location_kb
+
 
 _PERSONA_LABELS = {
     Persona.historian: "📜 Историк",
@@ -212,7 +262,7 @@ _HELP = (
 
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
-    await message.answer(_HELP, reply_markup=_location_kb)
+    await message.answer(_HELP, reply_markup=_location_markup())
 
 
 @router.message(Command("help"))
@@ -225,7 +275,7 @@ async def cmd_whereami(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     if session.get("lat") is None:
-        await message.answer("Сначала отправь геолокацию 📍", reply_markup=_location_kb)
+        await message.answer("Сначала отправь геолокацию 📍", reply_markup=_location_markup())
         return
     await _dispatch(message, lat=session["lat"], lon=session["lon"], user_message=None)
 
@@ -235,7 +285,7 @@ async def cmd_continue(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     if session.get("lat") is None:
-        await message.answer("Сначала отправь геолокацию 📍", reply_markup=_location_kb)
+        await message.answer("Сначала отправь геолокацию 📍", reply_markup=_location_markup())
         return
     await _dispatch(
         message,
@@ -280,7 +330,7 @@ async def cmd_new(message: Message) -> None:
     logger.info("\033[34mTG   ›\033[0m new conversation  chat=\033[36m%d\033[0m", chat_id)
     await message.answer(
         "🔄 <b>Новый разговор</b>\n\nЛокация и история сброшены. Отправь 📍 чтобы начать.",
-        reply_markup=_location_kb,
+        reply_markup=_location_markup(),
     )
 
 
@@ -422,6 +472,43 @@ async def cb_fmt(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("sample:"))
+async def cb_sample(callback: CallbackQuery) -> None:
+    """Debug-mode: inject a sample location and trigger the standard dispatch pipeline."""
+    idx = int(callback.data.split(":", 1)[1])
+    if idx >= len(_SAMPLES):
+        await callback.answer("⚠️ Сэмпл не найден")
+        return
+
+    sample = _SAMPLES[idx]
+    lat: float = sample["latitude"]
+    lon: float = sample["longitude"]
+    chat_id = callback.message.chat.id
+    label = _SAMPLE_LABELS[idx] if idx < len(_SAMPLE_LABELS) else sample.get("_location", f"Sample {idx}")
+
+    logger.info(
+        "\033[33mDBG  ›\033[0m sample tap  chat=\033[36m%d\033[0m  #%d  %s  lat=%.4f lon=%.4f",
+        chat_id,
+        idx,
+        label,
+        lat,
+        lon,
+    )
+
+    session = await _get_session(chat_id)
+    session["lat"] = lat
+    session["lon"] = lon
+    await _persist_session(chat_id)
+
+    await callback.answer(f"📍 {label}")
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    await _dispatch(callback.message, lat=lat, lon=lon, user_message=None)
+
+
 # ── Location & text ───────────────────────────────────────────────────────────
 
 
@@ -450,7 +537,7 @@ async def handle_photo(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     if session.get("lat") is None:
-        await message.answer("Сначала отправь геолокацию 📍, потом фото.", reply_markup=_location_kb)
+        await message.answer("Сначала отправь геолокацию 📍, потом фото.", reply_markup=_location_markup())
         return
 
     photo = message.photo[-1]
@@ -533,7 +620,7 @@ async def _dispatch(
     # No location yet → show the persistent location keyboard so user can share.
     # Location is known → show inline suggestions (reply keyboard persists independently).
     if not session.get("lat"):
-        markup = _location_kb
+        markup = _location_markup()
     elif has_buttons:
         markup = _suggestions_kb(suggestions, recommended_personas)
     else:
