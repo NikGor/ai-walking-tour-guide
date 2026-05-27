@@ -15,11 +15,15 @@ logger = logging.getLogger(__name__)
 _agent = AgentFactory()
 
 
+def _conv_title(request: ChatRequest) -> str:
+    return f"{request.latitude:.4f}, {request.longitude:.4f} | {request.persona.value}"
+
+
 def _render(result: ChatResponse, fmt: str) -> str:
     if fmt == "html":
-        return f"<h1>{result.title}</h1>\n<p>{result.text}</p>"
+        return f"<p>{result.text}</p>"
     if fmt == "ssml":
-        return f"<speak><p>{result.title}. {result.text}</p></speak>"
+        return f"<speak><p>{result.text}</p></speak>"
     return result.text
 
 
@@ -41,7 +45,7 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
     parsed_result = await _agent.run(request)
     result: ChatResponse = parsed_result.parsed_content
 
-    conv = await get_or_create_conversation(db, request.conversation_id, title=result.title)
+    conv = await get_or_create_conversation(db, request.conversation_id, title=_conv_title(request))
 
     # ── Save user message ──────────────────────────────────────────────────────
     await save_message(
@@ -75,7 +79,7 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
 
     logger.info("=== STEP 4: Response Ready ===")
     logger.info(
-        "\033[32mRESP ›\033[0m \033[1m%s\033[0m  \033[2mconv:%s\033[0m",
-        result.title, conv.id[:8],
+        "\033[32mRESP ›\033[0m words=\033[33m%d\033[0m  \033[2mconv:%s\033[0m",
+        len(content_text.split()), conv.id[:8],
     )
     return message

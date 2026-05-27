@@ -22,9 +22,8 @@ class Persona(str, Enum):
 # ── Tour response ─────────────────────────────────────────────────────────────
 
 class ChatResponse(BaseModel):
-    """LLM output — location title and narrative text."""
+    """LLM output — narrative text about the location."""
 
-    title: str
     text: str
 
 
