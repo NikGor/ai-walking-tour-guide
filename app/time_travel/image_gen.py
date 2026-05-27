@@ -8,9 +8,9 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # Gemini model that natively generates images alongside text.
-# Falls back to Imagen 3 if unavailable.
-_GEMINI_IMAGE_MODEL = "gemini-2.0-flash-preview-image-generation"
-_IMAGEN_MODEL = "imagen-3.0-generate-002"
+# Falls back to Imagen 4 Fast if unavailable.
+_GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image"
+_IMAGEN_MODEL = "imagen-4.0-fast-generate-001"
 
 
 def _style_suffix(style: str) -> str:
@@ -44,9 +44,10 @@ async def generate_image(
     Returns (base64_image_data, mime_type).
     Returns (None, "") on failure.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
+    # Accept either GEMINI_API_KEY or GOOGLE_API_KEY (Railway may only have one of them)
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        logger.error("time_travel_img_001: GEMINI_API_KEY not set")
+        logger.error("time_travel_img_001: neither GEMINI_API_KEY nor GOOGLE_API_KEY is set")
         return None, ""
 
     full_prompt = image_prompt + _style_suffix(style)
