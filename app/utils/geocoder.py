@@ -140,8 +140,8 @@ async def _fetch_wikipedia(tag: str) -> str | None:
 
 
 def _build_context(lat: float, lon: float, nom: dict, nearby: list[dict]) -> LocationContext:
-    address = nom.get("address", {})
-    extratags = nom.get("extratags", {})
+    address = nom.get("address") or {}
+    extratags = nom.get("extratags") or {}
 
     parts: list[str] = []
     for key in (
