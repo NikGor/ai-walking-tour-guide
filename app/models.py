@@ -11,7 +11,7 @@ class Persona(str, Enum):
     roman_empire = "roman_empire"
     ww2_context = "ww2_context"
     cyberpunk = "cyberpunk"
-    fantasy_bard = "fantasy_bard"
+    storyteller = "storyteller"
     local_grandpa = "local_grandpa"
 
 
