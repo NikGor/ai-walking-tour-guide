@@ -64,7 +64,7 @@ _TOOLS = [
 ]
 
 
-async def _execute_tool(name: str, args: dict, lat: float, lon: float) -> str:
+async def _execute_tool(name: str, args: dict[str, Any], lat: float, lon: float) -> str:
     """Execute a tool call and return its result as a string."""
     if name == "google_search":
         result = await google_search_tool(args["query"])
@@ -98,7 +98,7 @@ class AgentFactory:
     async def run(
         self,
         request: ChatRequest,
-        history: list[dict] | None = None,
+        history: list[dict[str, Any]] | None = None,
     ) -> ParsedLLMResponse:
         has_location = request.latitude is not None and request.longitude is not None
 
@@ -117,7 +117,7 @@ class AgentFactory:
             language=request.language,
         )
 
-        current_user_msg = (
+        current_user_msg: str | list[dict[str, Any]] = (
             user_message
             if not request.photo_url
             else [
