@@ -16,8 +16,14 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from alembic import command
+    from alembic.config import Config
     logger.info("=== STEP 1: App Init ===")
-    logger.info("main_001: Solaris Pliny ready on \033[36m0.0.0.0:8000\033[0m")
+    alembic_cfg = Config("alembic.ini")
+    alembic_cfg.attributes["skip_logging"] = True
+    command.upgrade(alembic_cfg, "head")
+    logger.info("main_001: DB migrations applied")
+    logger.info("main_002: Solaris Pliny ready on \033[36m0.0.0.0:8000\033[0m")
     yield
 
 
