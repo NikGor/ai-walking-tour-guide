@@ -29,9 +29,11 @@ _TOOLS: list[dict] = [
     {
         "name": "google_places_search",
         "description": (
-            "Find a specific nearby venue — restaurant, museum, café, etc. "
-            "Use ONLY when the user explicitly asks to find or recommend a type of place nearby. "
-            "Never use for historical or architectural questions."
+            "Find nearby venues — restaurants, cafés, museums, bars, shops, etc. "
+            "ALWAYS call this tool when the user asks where to eat, drink, visit, or find any type of venue. "
+            "NEVER answer venue questions from your own knowledge — "
+            "venue names and details must come from this tool. "
+            "Invented or guessed venue names are a critical failure."
         ),
         "parameters": {
             "type": "object",
