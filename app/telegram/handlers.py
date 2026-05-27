@@ -11,6 +11,7 @@ from aiogram.types import (
     KeyboardButton,
     Message,
     ReplyKeyboardMarkup,
+    WebAppInfo,
 )
 from sqlalchemy import func, select
 
@@ -67,7 +68,19 @@ async def _persist_session(chat_id: int) -> None:
 # ── Keyboards ─────────────────────────────────────────────────────────────────
 
 _location_button = KeyboardButton(text="📍 Локация", request_location=True)
-_location_kb = ReplyKeyboardMarkup(keyboard=[[_location_button]], resize_keyboard=True, is_persistent=True)
+
+# Time Travel Mini App button — only shown when APP_BASE_URL is configured (HTTPS required by Telegram).
+_APP_BASE_URL = os.getenv("APP_BASE_URL", "").rstrip("/")
+if _APP_BASE_URL:
+    _time_travel_button = KeyboardButton(
+        text="🕰 Машина времени",
+        web_app=WebAppInfo(url=f"{_APP_BASE_URL}/time-travel"),
+    )
+    _kb_row = [_location_button, _time_travel_button]
+else:
+    _kb_row = [_location_button]
+
+_location_kb = ReplyKeyboardMarkup(keyboard=[_kb_row], resize_keyboard=True, is_persistent=True)
 
 _PERSONA_LABELS = {
     Persona.historian: "📜 Историк",
@@ -179,7 +192,8 @@ _HELP = (
     "<b>Как пользоваться:</b>\n"
     "1. Отправь 📍 геолокацию — получи историю места\n"
     "2. Напиши вопрос — уточни детали или спроси о чём-то рядом\n"
-    "3. Отправь фото — бот определит объект и расскажет его историю\n\n"
+    "3. Отправь фото — бот определит объект и расскажет его историю\n"
+    "4. Нажми 🕰 <b>Машина времени</b> — посмотри как выглядело место в любую эпоху\n\n"
     "<b>Команды:</b>\n"
     "/whereami — история текущего места\n"
     "/continue — продолжить рассказ\n"

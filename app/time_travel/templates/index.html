@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>🕰 Машина времени</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg:           var(--tg-theme-bg-color, #1a1a2e);
+      --secondary-bg: var(--tg-theme-secondary-bg-color, #16213e);
+      --text:         var(--tg-theme-text-color, #eee);
+      --hint:         var(--tg-theme-hint-color, #888);
+      --btn-bg:       var(--tg-theme-button-color, #4361ee);
+      --btn-text:     var(--tg-theme-button-text-color, #fff);
+      --link:         var(--tg-theme-link-color, #64b5f6);
+      --accent:       var(--tg-theme-accent-text-color, #4361ee);
+      --border:       rgba(255,255,255,0.08);
+      --radius:       14px;
+      --radius-sm:    8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Screens ─────────────────────────────── */
+    .screen { display: none; flex-direction: column; min-height: 100vh; }
+    .screen.active { display: flex; }
+
+    /* ── Setup screen ────────────────────────── */
+    #screen-setup {
+      padding: 16px 16px 100px; /* bottom padding for Telegram MainButton */
+      gap: 16px;
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0 4px;
+    }
+    .app-header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .location-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--secondary-bg);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-size: 14px;
+      color: var(--hint);
+      cursor: pointer;
+      border: 1px solid var(--border);
+      transition: opacity 0.15s;
+    }
+    .location-badge.loaded { color: var(--text); }
+    .location-badge:active { opacity: 0.7; }
+    .location-badge .loc-icon { font-size: 18px; flex-shrink: 0; }
+    .location-badge .loc-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .location-badge .loc-change { font-size: 12px; color: var(--link); flex-shrink: 0; }
+
+    /* ── Section label ───────────────────────── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--hint);
+      padding: 0 2px;
+    }
+
+    /* ── Time section ────────────────────────── */
+    .time-section { display: flex; flex-direction: column; gap: 12px; }
+
+    .year-display {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .year-display input[type="number"] {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 42px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      width: 160px;
+      outline: none;
+      -moz-appearance: textfield;
+    }
+    .year-display input[type="number"]::-webkit-inner-spin-button,
+    .year-display input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .year-era-label {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--hint);
+      padding-bottom: 4px;
+    }
+
+    .era-toggle {
+      display: flex;
+      background: var(--secondary-bg);
+      border-radius: 999px;
+      padding: 3px;
+      gap: 2px;
+      width: fit-content;
+    }
+    .era-btn {
+      padding: 6px 20px;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: var(--hint);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .era-btn.active {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+    }
+
+    .year-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+    .year-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--btn-bg);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      cursor: pointer;
+    }
+    .year-slider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--btn-bg);
+      border: none;
+      cursor: pointer;
+    }
+
+    /* ── Presets ─────────────────────────────── */
+    .presets-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .preset-btn {
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .preset-btn:active { opacity: 0.7; }
+    .preset-btn .preset-year { display: block; font-size: 12px; color: var(--hint); margin-top: 2px; }
+
+    /* ── Style selector ──────────────────────── */
+    .style-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .style-btn {
+      background: var(--secondary-bg);
+      border: 2px solid transparent;
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      padding: 12px 8px;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .style-btn .style-icon { font-size: 22px; }
+    .style-btn.active {
+      border-color: var(--btn-bg);
+      background: color-mix(in srgb, var(--btn-bg) 15%, var(--secondary-bg));
+    }
+    .style-btn:active { opacity: 0.7; }
+
+    /* ── My street (photo upload) ────────────── */
+    .my-street-section { display: flex; flex-direction: column; gap: 10px; }
+
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .upload-area:active { opacity: 0.7; }
+    .upload-area.has-image { border-style: solid; border-color: var(--btn-bg); }
+    .upload-area input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-area .upload-icon { font-size: 32px; margin-bottom: 8px; }
+    .upload-area .upload-hint { font-size: 14px; color: var(--hint); }
+    .upload-area .upload-preview {
+      max-width: 100%;
+      max-height: 160px;
+      border-radius: var(--radius-sm);
+      object-fit: cover;
+    }
+
+    /* ── Generate button (fallback, shown if Telegram MainButton unavailable) */
+    #generate-btn-fallback {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: none;
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.15s;
+      position: sticky;
+      bottom: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    #generate-btn-fallback:active { opacity: 0.8; }
+
+    /* ── Loading screen ──────────────────────── */
+    #screen-loading {
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 40px 24px;
+    }
+
+    .loader-circle {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 4px solid var(--border);
+      border-top-color: var(--btn-bg);
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-label { font-size: 16px; color: var(--hint); text-align: center; }
+
+    /* ── Result screen ───────────────────────── */
+    #screen-result {
+      flex-direction: column;
+    }
+
+    .result-image-wrap {
+      width: 100%;
+      background: var(--secondary-bg);
+      position: relative;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .result-image {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+      max-height: 55vh;
+    }
+    .result-image-placeholder {
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--hint);
+      font-size: 40px;
+    }
+
+    .result-content {
+      flex: 1;
+      padding: 20px 16px 100px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .result-era {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: color-mix(in srgb, var(--btn-bg) 20%, transparent);
+      border: 1px solid color-mix(in srgb, var(--btn-bg) 40%, transparent);
+      border-radius: 999px;
+      padding: 5px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--link);
+    }
+
+    .result-location {
+      font-size: 13px;
+      color: var(--hint);
+    }
+
+    .result-text {
+      font-size: 15px;
+      line-height: 1.65;
+      color: var(--text);
+    }
+
+    .result-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      position: sticky;
+      bottom: 16px;
+    }
+    .action-btn {
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: opacity 0.15s;
+    }
+    .action-btn:active { opacity: 0.7; }
+    .action-btn.primary {
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border-color: transparent;
+    }
+
+    /* ── Error banner ────────────────────────── */
+    .error-banner {
+      background: color-mix(in srgb, #e53935 20%, var(--bg));
+      border: 1px solid #e53935;
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #ef9a9a;
+      display: none;
+    }
+    .error-banner.visible { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- ── Setup screen ─────────────────────────────────────────────────── -->
+<div id="screen-setup" class="screen active">
+
+  <div class="app-header">
+    <span style="font-size:28px">🕰</span>
+    <h1>Машина времени</h1>
+  </div>
+
+  <!-- Location -->
+  <div id="location-badge" class="location-badge" onclick="requestLocation()">
+    <span class="loc-icon">📍</span>
+    <span class="loc-text" id="loc-text">Нажми чтобы определить место</span>
+    <span class="loc-change" id="loc-change"></span>
+  </div>
+
+  <!-- Error banner -->
+  <div id="error-banner" class="error-banner"></div>
+
+  <!-- Time selection -->
+  <div class="section-label">Куда перенести?</div>
+  <div class="time-section">
+    <div class="year-display">
+      <input type="number" id="year-input" value="1462" min="-65000000" max="2200" />
+      <span class="year-era-label" id="era-label-display">н.э.</span>
+    </div>
+    <div class="era-toggle">
+      <button class="era-btn" id="btn-bce" onclick="setEra('BCE')">до н.э.</button>
+      <button class="era-btn active" id="btn-ce" onclick="setEra('CE')">н.э.</button>
+    </div>
+    <input type="range" class="year-slider" id="year-slider"
+           min="-3000" max="2200" value="1462" step="1"
+           oninput="onSliderInput(this.value)" />
+  </div>
+
+  <!-- Presets -->
+  <div class="section-label">Эпохи</div>
+  <div class="presets-grid">
+    <button class="preset-btn" onclick="setPreset(-65000000,'BCE')">
+      🦕 Динозавры<span class="preset-year">65 млн до н.э.</span>
+    </button>
+    <button class="preset-btn" onclick="setPreset(-2560,'BCE')">
+      🏺 Пирамиды<span class="preset-year">2560 до н.э.</span>
+    </button>
+    <button class="preset-btn" onclick="setPreset(1200,'CE')">
+      ⚔️ Средневековье<span class="preset-year">1200 н.э.</span>
+    </button>
+    <button class="preset-btn" onclick="setPreset(1912,'CE')">
+      ⚓ Титаник<span class="preset-year">1912 н.э.</span>
+    </button>
+    <button class="preset-btn" onclick="setPreset(1969,'CE')">
+      🚀 Луна-69<span class="preset-year">1969 н.э.</span>
+    </button>
+    <button class="preset-btn" onclick="setPreset(2150,'CE')">
+      🤖 Киберпанк<span class="preset-year">2150 н.э.</span>
+    </button>
+  </div>
+
+  <!-- Style -->
+  <div class="section-label">Стиль</div>
+  <div class="style-grid">
+    <button class="style-btn active" id="style-photorealistic" onclick="setStyle('photorealistic')">
+      <span class="style-icon">📷</span>Реалистично
+    </button>
+    <button class="style-btn" id="style-selfie" onclick="setStyle('selfie')">
+      <span class="style-icon">🤳</span>Селфи
+    </button>
+    <button class="style-btn" id="style-art" onclick="setStyle('art')">
+      <span class="style-icon">🎨</span>Арт эпохи
+    </button>
+  </div>
+
+  <!-- My street (img2img) -->
+  <div class="section-label">Моя улица <span style="color:var(--hint);font-weight:400;text-transform:none;font-size:11px">(необязательно)</span></div>
+  <div class="my-street-section">
+    <div class="upload-area" id="upload-area">
+      <input type="file" id="ref-photo-input" accept="image/*" onchange="onPhotoSelected(this)" />
+      <div id="upload-content">
+        <div class="upload-icon">📎</div>
+        <div class="upload-hint">Загрузи фото места — бот покажет его в другой эпохе</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fallback generate button (hidden if Telegram MainButton is available) -->
+  <button id="generate-btn-fallback" onclick="startGeneration()">
+    🚀 Перенести!
+  </button>
+
+</div>
+
+
+<!-- ── Loading screen ──────────────────────────────────────────────── -->
+<div id="screen-loading" class="screen">
+  <div class="loader-circle"></div>
+  <div class="loading-label" id="loading-label">Строим машину времени…</div>
+</div>
+
+
+<!-- ── Result screen ───────────────────────────────────────────────── -->
+<div id="screen-result" class="screen">
+
+  <div class="result-image-wrap">
+    <img id="result-img" class="result-image" src="" alt="" style="display:none" />
+    <div id="result-img-placeholder" class="result-image-placeholder">🖼</div>
+  </div>
+
+  <div class="result-content">
+    <div>
+      <div class="result-era" id="result-era-badge">⏳ …</div>
+    </div>
+    <div class="result-location" id="result-location-text"></div>
+    <div class="result-text" id="result-text"></div>
+
+    <div class="result-actions">
+      <button class="action-btn" onclick="goBack()">← Назад</button>
+      <button class="action-btn primary" onclick="saveImage()" id="save-btn">💾 Сохранить</button>
+    </div>
+  </div>
+
+</div>
+
+
+<script>
+  // ── Telegram Web App init ──────────────────────────────────────────────────
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+  }
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let state = {
+    lat: null,
+    lon: null,
+    locationName: null,
+    year: 1462,
+    era: 'CE',
+    style: 'photorealistic',
+    referenceImageB64: null,
+    lastResult: null,
+  };
+
+  // ── API base ───────────────────────────────────────────────────────────────
+  const API_BASE = '__API_BASE__' || window.location.origin;
+
+  // ── Screens ────────────────────────────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  // ── Location ───────────────────────────────────────────────────────────────
+  function setLocation(lat, lon, name) {
+    state.lat = lat;
+    state.lon = lon;
+    state.locationName = name || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    const badge = document.getElementById('location-badge');
+    badge.classList.add('loaded');
+    document.getElementById('loc-text').textContent = state.locationName;
+    document.getElementById('loc-change').textContent = 'Изменить';
+    updateMainButton();
+  }
+
+  function requestLocation() {
+    // Try Telegram LocationManager first
+    if (tg?.LocationManager) {
+      tg.LocationManager.init(() => {
+        if (tg.LocationManager.isLocationAvailable) {
+          tg.LocationManager.getLocation((loc) => {
+            if (loc) setLocation(loc.latitude, loc.longitude, null);
+            else tryBrowserGeo();
+          });
+        } else {
+          tryBrowserGeo();
+        }
+      });
+    } else {
+      tryBrowserGeo();
+    }
+  }
+
+  function tryBrowserGeo() {
+    if (!navigator.geolocation) {
+      showError('Геолокация недоступна. Открой бот и отправь 📍');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setLocation(pos.coords.latitude, pos.coords.longitude, null),
+      () => showError('Нет доступа к геолокации. Отправь 📍 в боте.'),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
+
+  // Try to pre-fill from URL params (e.g. opened via bot button with ?lat=...&lon=...)
+  (function () {
+    const p = new URLSearchParams(window.location.search);
+    const lat = parseFloat(p.get('lat'));
+    const lon = parseFloat(p.get('lon'));
+    const name = p.get('name');
+    if (!isNaN(lat) && !isNaN(lon)) {
+      setLocation(lat, lon, name ? decodeURIComponent(name) : null);
+    }
+  })();
+
+  // ── Year & era ─────────────────────────────────────────────────────────────
+  const yearInput = document.getElementById('year-input');
+  const yearSlider = document.getElementById('year-slider');
+
+  yearInput.addEventListener('input', () => {
+    let v = parseInt(yearInput.value, 10);
+    if (isNaN(v)) return;
+    state.year = Math.abs(v);
+    // Update slider (clamped to its range)
+    yearSlider.value = Math.min(Math.max(v, -3000), 2200);
+    updateMainButton();
+  });
+
+  function onSliderInput(v) {
+    const val = parseInt(v, 10);
+    if (val < 0) {
+      state.era = 'BCE';
+      state.year = Math.abs(val);
+    } else {
+      state.era = 'CE';
+      state.year = val;
+    }
+    yearInput.value = state.year;
+    syncEraUI();
+    updateMainButton();
+  }
+
+  function setEra(era) {
+    state.era = era;
+    syncEraUI();
+  }
+
+  function syncEraUI() {
+    document.getElementById('btn-bce').classList.toggle('active', state.era === 'BCE');
+    document.getElementById('btn-ce').classList.toggle('active', state.era === 'CE');
+    document.getElementById('era-label-display').textContent = state.era === 'BCE' ? 'до н.э.' : 'н.э.';
+  }
+
+  function setPreset(year, era) {
+    state.year = Math.abs(year);
+    state.era = era;
+    yearInput.value = state.year;
+    yearSlider.value = era === 'BCE' ? -Math.abs(year) : Math.abs(year);
+    syncEraUI();
+    updateMainButton();
+  }
+
+  // ── Style ──────────────────────────────────────────────────────────────────
+  function setStyle(style) {
+    state.style = style;
+    document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('style-' + style).classList.add('active');
+  }
+
+  // ── Photo upload ───────────────────────────────────────────────────────────
+  function onPhotoSelected(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const b64Full = e.target.result; // data:image/jpeg;base64,XXXXX
+      state.referenceImageB64 = b64Full.split(',')[1]; // raw base64
+      // Show preview
+      const area = document.getElementById('upload-area');
+      area.classList.add('has-image');
+      document.getElementById('upload-content').innerHTML =
+        `<img class="upload-preview" src="${b64Full}" alt="Фото" />`;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── Main button ────────────────────────────────────────────────────────────
+  function updateMainButton() {
+    const ready = state.lat !== null && state.year > 0;
+    const label = `🚀 Перенести в ${state.year} ${state.era === 'BCE' ? 'до н.э.' : 'н.э.'}`;
+
+    if (tg?.MainButton) {
+      if (ready) {
+        tg.MainButton.setText(label);
+        tg.MainButton.show();
+        tg.MainButton.enable();
+      } else {
+        tg.MainButton.hide();
+      }
+      // Hide fallback button when Telegram MainButton is available
+      document.getElementById('generate-btn-fallback').style.display = 'none';
+    } else {
+      // Fallback button for non-Telegram context
+      const btn = document.getElementById('generate-btn-fallback');
+      btn.textContent = label;
+      btn.disabled = !ready;
+      btn.style.opacity = ready ? '1' : '0.5';
+    }
+  }
+
+  if (tg?.MainButton) {
+    tg.MainButton.onClick(startGeneration);
+    document.getElementById('generate-btn-fallback').style.display = 'none';
+  }
+
+  // Initial sync
+  syncEraUI();
+  updateMainButton();
+
+  // ── Error ──────────────────────────────────────────────────────────────────
+  function showError(msg) {
+    const el = document.getElementById('error-banner');
+    el.textContent = msg;
+    el.classList.add('visible');
+    setTimeout(() => el.classList.remove('visible'), 6000);
+  }
+
+  // ── Loading messages ───────────────────────────────────────────────────────
+  const loadingMessages = [
+    '🔭 Запускаем машину времени…',
+    '🗺 Изучаем эпоху…',
+    '🎨 Рисуем прошлое…',
+    '📜 Поднимаем архивы…',
+    '⚙️ Калибруем хронотрон…',
+  ];
+  let loadingTimer = null;
+
+  function startLoadingMessages() {
+    let i = 0;
+    document.getElementById('loading-label').textContent = loadingMessages[0];
+    loadingTimer = setInterval(() => {
+      i = (i + 1) % loadingMessages.length;
+      document.getElementById('loading-label').textContent = loadingMessages[i];
+    }, 2500);
+  }
+
+  function stopLoadingMessages() {
+    if (loadingTimer) { clearInterval(loadingTimer); loadingTimer = null; }
+  }
+
+  // ── Generation ─────────────────────────────────────────────────────────────
+  async function startGeneration() {
+    if (!state.lat || !state.lon) {
+      showError('Сначала определи местоположение 📍');
+      return;
+    }
+
+    showScreen('screen-loading');
+    startLoadingMessages();
+
+    if (tg?.MainButton) {
+      tg.MainButton.showProgress(false);
+      tg.MainButton.disable();
+    }
+
+    try {
+      const body = {
+        latitude: state.lat,
+        longitude: state.lon,
+        year: state.year,
+        era: state.era,
+        style: state.style,
+        language: 'ru',
+      };
+      if (state.referenceImageB64) {
+        body.reference_image_b64 = state.referenceImageB64;
+      }
+
+      const res = await fetch(`${API_BASE}/time-travel/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      state.lastResult = data;
+      showResult(data);
+    } catch (e) {
+      showScreen('screen-setup');
+      showError(`Ошибка генерации: ${e.message}`);
+    } finally {
+      stopLoadingMessages();
+      if (tg?.MainButton) {
+        tg.MainButton.hideProgress();
+        tg.MainButton.enable();
+      }
+    }
+  }
+
+  function showResult(data) {
+    // Image
+    const img = document.getElementById('result-img');
+    const placeholder = document.getElementById('result-img-placeholder');
+    if (data.image_data) {
+      img.src = `data:${data.image_mime || 'image/jpeg'};base64,${data.image_data}`;
+      img.style.display = 'block';
+      placeholder.style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      placeholder.style.display = 'block';
+    }
+
+    // Text
+    document.getElementById('result-era-badge').textContent = `⏳ ${data.era_label}`;
+    document.getElementById('result-location-text').textContent = `📍 ${data.location_name}`;
+    document.getElementById('result-text').textContent = data.historical_text;
+
+    // Show save button only if there's an image
+    document.getElementById('save-btn').style.display = data.image_data ? '' : 'none';
+
+    if (tg?.MainButton) {
+      tg.MainButton.hide();
+    }
+    showScreen('screen-result');
+  }
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
+  function goBack() {
+    showScreen('screen-setup');
+    if (tg?.MainButton) updateMainButton();
+  }
+
+  // ── Save image ─────────────────────────────────────────────────────────────
+  function saveImage() {
+    if (!state.lastResult?.image_data) return;
+    const link = document.createElement('a');
+    link.href = `data:${state.lastResult.image_mime};base64,${state.lastResult.image_data}`;
+    link.download = `time_travel_${state.lastResult.era_label}.jpg`;
+    link.click();
+  }
+</script>
+</body>
+</html>
