@@ -129,8 +129,22 @@ async def get_user_settings(db: AsyncSession, chat_id: int) -> dict:
     result = await db.execute(select(UserSettingsORM).where(UserSettingsORM.chat_id == chat_id))
     row = result.scalar_one_or_none()
     if not row:
-        return {"persona": "historian", "lang": "auto", "fmt": "html", "lat": None, "lon": None}
-    return {"persona": row.persona, "lang": row.lang, "fmt": row.fmt, "lat": row.lat, "lon": row.lon}
+        return {
+            "persona": "historian",
+            "lang": "auto",
+            "fmt": "html",
+            "lat": None,
+            "lon": None,
+            "voice": False,
+        }  # noqa: E501
+    return {
+        "persona": row.persona,
+        "lang": row.lang,
+        "fmt": row.fmt,
+        "lat": row.lat,
+        "lon": row.lon,
+        "voice": bool(row.voice),
+    }
 
 
 async def upsert_user_settings(
@@ -141,15 +155,16 @@ async def upsert_user_settings(
     fmt: str,
     lat: float | None,
     lon: float | None,
+    voice: bool = False,
 ) -> None:
     """Insert or update user settings for a Telegram chat — race-safe upsert."""
-    values = dict(chat_id=chat_id, persona=persona, lang=lang, fmt=fmt, lat=lat, lon=lon)
+    values = dict(chat_id=chat_id, persona=persona, lang=lang, fmt=fmt, lat=lat, lon=lon, voice=voice)
     stmt = (
         _dialect_insert(UserSettingsORM)
         .values(**values)
         .on_conflict_do_update(
             index_elements=["chat_id"],
-            set_=dict(persona=persona, lang=lang, fmt=fmt, lat=lat, lon=lon),
+            set_=dict(persona=persona, lang=lang, fmt=fmt, lat=lat, lon=lon, voice=voice),
         )
     )
     await db.execute(stmt)

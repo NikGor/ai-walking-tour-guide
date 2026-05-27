@@ -42,6 +42,7 @@ async def start_polling() -> None:
             BotCommand(command="modes", description="Стиль рассказа (персона)"),
             BotCommand(command="lang", description="Язык ответов"),
             BotCommand(command="fmt", description="Формат текста (HTML / Markdown)"),
+            BotCommand(command="voice", description="Включить / выключить голосовые ответы 🔊"),
             BotCommand(command="new", description="Начать новый разговор"),
             BotCommand(command="history", description="Статистика сессии"),
             BotCommand(command="settings", description="Все настройки"),

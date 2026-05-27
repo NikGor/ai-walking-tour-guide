@@ -7,6 +7,7 @@ from aiogram import F, Router
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import (
+    BufferedInputFile,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -67,6 +68,7 @@ async def _persist_session(chat_id: int) -> None:
             fmt=s.get("fmt", RESPONSE_FORMAT),
             lat=s.get("lat"),
             lon=s.get("lon"),
+            voice=s.get("voice", False),
         )
         await db.commit()
 
@@ -250,6 +252,7 @@ _HELP = (
     "/modes — стиль рассказа\n"
     "/lang — язык ответов\n"
     "/fmt — формат текста (HTML / Markdown)\n"
+    "/voice — включить / выключить голосовые ответы 🔊\n"
     "/new — начать новый разговор\n"
     "/history — статистика сессии\n"
     "/settings — все настройки\n"
@@ -319,6 +322,24 @@ async def cmd_fmt(message: Message) -> None:
     await message.answer("Выбери формат текста:", reply_markup=_fmt_kb(fmt))
 
 
+@router.message(Command("voice"))
+async def cmd_voice(message: Message) -> None:
+    chat_id = message.chat.id
+    session = await _get_session(chat_id)
+    new_state = not session.get("voice", False)
+    session["voice"] = new_state
+    await _persist_session(chat_id)
+    if new_state:
+        await message.answer(
+            "🔊 <b>Голосовой режим включён</b>\n\n"
+            "Ответы будут отправляться как голосовые сообщения.\n"
+            "Требуется <code>OPENAI_API_KEY</code>.\n\n"
+            "/voice — выключить"
+        )
+    else:
+        await message.answer("🔇 <b>Голосовой режим выключен</b>\n\nОтветы снова текстовые.")
+
+
 @router.message(Command("new"))
 async def cmd_new(message: Message) -> None:
     chat_id = message.chat.id
@@ -377,16 +398,18 @@ async def cmd_settings(message: Message) -> None:
     lon = session.get("lon")
 
     fmt = session.get("fmt", RESPONSE_FORMAT)
+    voice = session.get("voice", False)
     location_str = f"{lat:.4f}, {lon:.4f}" if lat else "не задана"
     lines = [
         "⚙️ <b>Настройки</b>",
         f"🎭 Стиль: <b>{_PERSONA_LABELS[persona]}</b>",
         f"🌐 Язык: <b>{_LANG_LABELS[lang]}</b>",
         f"📄 Формат: <b>{_FMT_LABELS.get(fmt, fmt)}</b>",
+        f"{'🔊' if voice else '🔇'} Голос: <b>{'включён' if voice else 'выключен'}</b>",
         f"📍 Последняя локация: <code>{location_str}</code>",
         f"🆔 Chat ID: <code>{chat_id}</code>",
         "",
-        "/modes — стиль  •  /lang — язык  •  /fmt — формат",
+        "/modes — стиль  •  /lang — язык  •  /fmt — формат  •  /voice — голос",
         "/new — начать новый разговор",
     ]
     await message.answer("\n".join(lines))
@@ -625,5 +648,19 @@ async def _dispatch(
         markup = _suggestions_kb(suggestions, recommended_personas)
     else:
         markup = None
+
     await thinking.delete()
+
+    # ── Voice mode ────────────────────────────────────────────────────────────
+    if session.get("voice") and reply and not reply.startswith("⚠️"):
+        from app.telegram.tts import synthesise
+
+        audio = await synthesise(reply)
+        if audio:
+            voice_file = BufferedInputFile(audio, filename="voice.mp3")
+            await message.answer_voice(voice=voice_file, reply_markup=markup)
+            return
+        # TTS failed → fall back to text silently
+        logger.warning("tts_fallback: synthesis failed for chat %d, sending text", chat_id)
+
     await message.answer(reply, parse_mode=_parse_mode(fmt), reply_markup=markup)
