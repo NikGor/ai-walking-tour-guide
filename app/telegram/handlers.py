@@ -78,6 +78,7 @@ _PERSONA_LABELS = {
     Persona.storyteller: "🎭 Сказитель",
     Persona.medieval_resident: "🏚 Житель средних веков",
     Persona.military_expert: "🗡 Военный историк",
+    Persona.deep_time: "🧊 Геолог / ледниковый период",
 }
 
 _LANG_LABELS = {
