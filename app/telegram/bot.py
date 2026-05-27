@@ -38,8 +38,10 @@ async def start_polling() -> None:
     await bot.set_my_commands(
         [
             BotCommand(command="whereami", description="История текущего места"),
-            BotCommand(command="modes", description="Стиль рассказа"),
+            BotCommand(command="continue", description="Продолжить рассказ"),
+            BotCommand(command="modes", description="Стиль рассказа (персона)"),
             BotCommand(command="lang", description="Язык ответов"),
+            BotCommand(command="fmt", description="Формат текста (HTML / Markdown)"),
             BotCommand(command="new", description="Начать новый разговор"),
             BotCommand(command="history", description="Статистика сессии"),
             BotCommand(command="settings", description="Все настройки"),
