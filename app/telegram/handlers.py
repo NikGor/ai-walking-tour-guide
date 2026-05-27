@@ -73,13 +73,9 @@ _location_kb = ReplyKeyboardMarkup(
 
 _PERSONA_LABELS = {
     Persona.historian: "📜 Историк",
-    Persona.dark_tourism: "💀 Тёмный туризм",
     Persona.architecture_expert: "🏛 Архитектор",
     Persona.roman_empire: "⚔️ Римская империя",
-    Persona.ww2_context: "🪖 Вторая мировая",
-    Persona.cyberpunk: "🤖 Киберпанк",
     Persona.storyteller: "🎭 Сказитель",
-    Persona.local_grandpa: "👴 Местный дед",
 }
 
 _LANG_LABELS = {

@@ -28,8 +28,8 @@ def test_system_prompt_renders_for_every_persona(builder, persona):
 
 def test_system_prompt_different_per_persona(builder):
     historian = builder.build_system_prompt(Persona.historian)
-    cyberpunk = builder.build_system_prompt(Persona.cyberpunk)
-    assert historian != cyberpunk
+    storyteller = builder.build_system_prompt(Persona.storyteller)
+    assert historian != storyteller
 
 
 # ── build_user_message ────────────────────────────────────────────────────────

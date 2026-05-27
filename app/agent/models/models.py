@@ -9,13 +9,9 @@ from pydantic import BaseModel, Field
 
 class Persona(StrEnum):
     historian = "historian"
-    dark_tourism = "dark_tourism"
     architecture_expert = "architecture_expert"
     roman_empire = "roman_empire"
-    ww2_context = "ww2_context"
-    cyberpunk = "cyberpunk"
     storyteller = "storyteller"
-    local_grandpa = "local_grandpa"
 
 
 # ── Tour response ─────────────────────────────────────────────────────────────
