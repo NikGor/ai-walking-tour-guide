@@ -25,6 +25,14 @@ async def lifespan(app: FastAPI):
     logger.info("=== STEP 1: App Init ===")
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.attributes["skip_logging"] = True
+
+    # Pass the runtime DB URL to Alembic, stripping async drivers so the
+    # sync Alembic engine works (asyncpg/aiosqlite are async-only).
+    from app.db.session import DATABASE_URL
+
+    sync_url = DATABASE_URL.replace("+asyncpg", "").replace("+aiosqlite", "")
+    alembic_cfg.set_main_option("sqlalchemy.url", sync_url)
+
     command.upgrade(alembic_cfg, "head")
     logger.info("main_001: DB migrations applied")
     logger.info("main_002: Solaris Pliny ready on \033[36m0.0.0.0:8000\033[0m")

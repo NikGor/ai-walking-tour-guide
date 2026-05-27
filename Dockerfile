@@ -22,6 +22,9 @@ ENV SOLARIS_DB_URL=sqlite+aiosqlite:///./data/solaris.db
 # ENV SOLARIS_DB_URL=sqlite+aiosqlite:////var/lib/solaris/solaris.db
 # ──────────────────────────────────────────────────────────────────────────
 
+# Create data dir for SQLite fallback (ignored when Postgres URL is set)
+RUN mkdir -p data
+
 EXPOSE 8000
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
