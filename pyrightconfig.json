@@ -1,7 +1,0 @@
-{
-  "pythonVersion": "3.11",
-  "pythonPath": "/home/niko/.cache/pypoetry/virtualenvs/solaris-pliny-ULN8iqZN-py3.11/bin/python",
-  "include": ["."],
-  "extraPaths": ["."],
-  "typeCheckingMode": "basic"
-}
