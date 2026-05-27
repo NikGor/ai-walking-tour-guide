@@ -29,3 +29,7 @@ client_secret_796314691409-tljqjb7gn0cp1kbibuk5srhkuvuv0fh7.apps.googleuserconte
 # OS
 .DS_Store
 
+# Claude
+.claude/
+
+
