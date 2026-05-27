@@ -111,6 +111,8 @@ class PipelineTrace(BaseModel):
 class ChatMessage(BaseModel):
     """Individual chat message in a conversation."""
 
+    model_config = {"arbitrary_types_allowed": True}
+
     message_id: str | None = Field(default=None, description="Unique identifier for the message")
     role: Literal["user", "assistant", "system"] = Field(description="Role of the message sender")
     content: Content = Field(description="Structured content of the message")
@@ -118,6 +120,7 @@ class ChatMessage(BaseModel):
     recommended_personas: list[str] = Field(
         default_factory=list, description="LLM-suggested specialist persona slugs (0-2)"
     )
+    map_image: bytes | None = Field(default=None, description="Optional map PNG from a tour tool")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="Timestamp when the message was created",

@@ -42,7 +42,7 @@ class AgentFactory:
         )
 
         # ── Agentic loop (tools → structured output) ──────────────────────────
-        raw = await run_agentic_loop(
+        raw, map_png = await run_agentic_loop(
             client=self._client,
             messages=messages,
             tools=get_tools(has_location),
@@ -52,6 +52,8 @@ class AgentFactory:
 
         # ── Parse & log ───────────────────────────────────────────────────────
         parsed = parse_openrouter_response(raw, ChatResponse)
+        if map_png:
+            parsed.map_image = map_png
         result = cast(ChatResponse, parsed.parsed_content)
 
         logger.info(

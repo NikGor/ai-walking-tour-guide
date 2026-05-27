@@ -23,8 +23,13 @@ async def run_agentic_loop(
     tools: list[dict],
     request: ChatRequest,
     model: str,
-) -> Any:
-    """Run the agentic loop and return the raw final LLM response."""
+) -> tuple[Any, bytes | None]:
+    """Run the agentic loop.
+
+    Returns:
+        (raw_llm_response, map_png) — map_png is non-None when a tool produced a map image.
+    """
+    map_png: bytes | None = None
 
     # ── Round 1: with tools ───────────────────────────────────────────────────
     raw = await client.create_completion(messages=messages, model=model, tools=tools)
@@ -52,8 +57,10 @@ async def run_agentic_loop(
         for tc in tool_calls:
             args = json.loads(tc.function.arguments)
             logger.info("\033[32mTOOL ›\033[0m \033[1m%s\033[0m  args=%s", tc.function.name, args)
-            result = await execute_tool(tc.function.name, args, lat, lon)
-            messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+            result_str, tool_map_png = await execute_tool(tc.function.name, args, lat, lon)
+            if tool_map_png:
+                map_png = tool_map_png  # last map wins (normally only one tour tool per request)
+            messages.append({"role": "tool", "tool_call_id": tc.id, "content": result_str})
 
         # ── Round 2: structured output after tool results ─────────────────────
         logger.info("\033[35mLLM  ›\033[0m round 2 — structured output")
@@ -66,4 +73,4 @@ async def run_agentic_loop(
         messages.append({"role": "user", "content": "Now format your answer as JSON."})
         raw = await client.create_completion(messages=messages, model=model, response_format=ChatResponse)
 
-    return raw
+    return raw, map_png

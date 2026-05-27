@@ -642,11 +642,13 @@ async def _dispatch(
 
     thinking = await message.answer("⏳")
 
+    map_image: bytes | None = None
     try:
         async with AsyncSessionLocal() as db:
             response = await handle_chat(request, db)
         reply = response.content.text
         suggestions = response.suggestions
+        map_image = response.map_image
         # Don't recommend the persona that's already active
         # Filter out the currently active persona from recommendations
         recommended_personas = [p for p in response.recommended_personas if p != persona.value]
@@ -667,6 +669,11 @@ async def _dispatch(
         markup = None
 
     await thinking.delete()
+
+    # ── Map image (city tour) ─────────────────────────────────────────────────
+    if map_image:
+        map_file = BufferedInputFile(map_image, filename="tour_map.png")
+        await message.answer_photo(photo=map_file)
 
     # ── Voice mode ────────────────────────────────────────────────────────────
     if session.get("voice") and reply and not reply.startswith("⚠️"):

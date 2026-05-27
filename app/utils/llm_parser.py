@@ -36,6 +36,7 @@ class ParsedLLMResponse(BaseModel):
     parsed_content: Any
     llm_trace: LllmTrace
     response_id: str | None = None
+    map_image: bytes | None = None  # optional side-channel from tool (e.g. city tour map)
 
 
 # ── Cost helper ───────────────────────────────────────────────────────────────
