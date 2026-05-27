@@ -133,7 +133,7 @@ async def _generate_with_reference(
         try:
             image_bytes = base64.b64decode(reference_image_b64)
             contents = [
-                types.Part.from_text(prompt),
+                types.Part.from_text(text=prompt),
                 types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
             ]
             response = await client.aio.models.generate_content(
