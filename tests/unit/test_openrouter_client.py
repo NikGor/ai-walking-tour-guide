@@ -1,5 +1,7 @@
 """Unit tests for OpenRouterClient — schema building, no real API calls."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from app.agent.models.models import ChatResponse
@@ -8,25 +10,27 @@ from app.backend.openrouter_client import OpenRouterClient
 
 @pytest.fixture
 def client():
-    return OpenRouterClient()
+    """OpenRouterClient with the OpenAI HTTP client mocked out — no API key needed."""
+    with patch("app.backend.openrouter_client.OpenAI", return_value=MagicMock()):
+        return OpenRouterClient()
 
 
-# ── _enforce_no_additional_properties ────────────────────────────────────────
+# ── _enforce_no_additional_properties (static — no instance needed) ───────────
 
 
-def test_enforce_adds_additional_properties_to_object(client):
+def test_enforce_adds_additional_properties_to_object():
     schema = {"type": "object", "properties": {"name": {"type": "string"}}}
     result = OpenRouterClient._enforce_no_additional_properties(schema)
     assert result["additionalProperties"] is False
 
 
-def test_enforce_does_not_overwrite_existing(client):
+def test_enforce_does_not_overwrite_existing():
     schema = {"type": "object", "additionalProperties": True}
     result = OpenRouterClient._enforce_no_additional_properties(schema)
-    assert result["additionalProperties"] is True  # not overwritten
+    assert result["additionalProperties"] is True
 
 
-def test_enforce_recurses_into_properties(client):
+def test_enforce_recurses_into_properties():
     schema = {
         "type": "object",
         "properties": {
