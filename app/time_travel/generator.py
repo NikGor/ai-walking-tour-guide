@@ -2,151 +2,314 @@
 
 Flow:
   1. Geocode coordinates → location name + context
-  2. Call LLM to generate historical description + image prompt (JSON)
-  3. Call Gemini to generate the image
+  2. Gemini 3 Pro Preview (+ Google Search Grounding) → historical analysis + visual_prompt JSON
+  3. Gemini image model → rendered historical image
   4. Return combined TimeTravelResponse
+
+Prompt system adapted from a production Time Travel app.
 """
 
 import json
 import logging
+import os
 from typing import Any
 
-from app.backend.openrouter_client import OpenRouterClient
 from app.time_travel.image_gen import generate_image
-from app.time_travel.models import TimeTravelRequest, TimeTravelResponse
+from app.time_travel.models import LuckyResponse, TimeTravelRequest, TimeTravelResponse
 from app.utils.geocoder import LocationContext, get_location_context
 
 logger = logging.getLogger(__name__)
 
-_LLM_MODEL = "openai/gpt-4.1"
-_client: OpenRouterClient | None = None
+# ── Model selection ────────────────────────────────────────────────────────────
+
+_ANALYSIS_MODEL = "gemini-3-pro-preview"  # text + Google Search Grounding
+_ANALYSIS_FALLBACK = "gemini-2.5-pro-preview-05-06"  # fallback if 3-pro unavailable
+
+# ── Season helper ──────────────────────────────────────────────────────────────
 
 
-def _get_client() -> OpenRouterClient:
-    global _client
-    if _client is None:
-        _client = OpenRouterClient()
-    return _client
+def _get_season(month: int | None) -> str:
+    if month is None:
+        return "Unknown"
+    if month in (12, 1, 2):
+        return "Winter"
+    if month in (3, 4, 5):
+        return "Spring"
+    if month in (6, 7, 8):
+        return "Summer"
+    return "Autumn"
 
 
-# ── Era formatting ─────────────────────────────────────────────────────────────
+# ── Era helpers ────────────────────────────────────────────────────────────────
 
 
 def _format_era(year: int, era: str, language: str) -> str:
-    """Return a human-readable era label in the requested language."""
     abs_year = abs(year)
     if language == "ru":
         suffix = "до н.э." if era == "BCE" else "н.э."
         return f"{abs_year:,} {suffix}".replace(",", " ")
-    else:
-        suffix = " BCE" if era == "BCE" else " CE"
-        return f"{abs_year:,}{suffix}"
+    suffix = " BCE" if era == "BCE" else " CE"
+    return f"{abs_year:,}{suffix}"
 
 
-def _year_for_prompt(year: int, era: str) -> str:
-    """Return a prompt-friendly year string like '1462 CE' or '2560 BCE'."""
+def _year_str(year: int, era: str) -> str:
     return f"{abs(year)} {era}"
 
 
-# ── LLM prompt ─────────────────────────────────────────────────────────────────
+# ── Role modules ───────────────────────────────────────────────────────────────
 
-_SYSTEM_PROMPT = """You are a visual historian. Given a location and a historical year, you produce:
-1. A vivid 2-paragraph historical narrative (100–150 words) describing what a person standing
-   at that exact location would have seen, heard, and smelled in that era.
-   Write in the requested language. Be specific — name materials, architecture styles,
-   who would have been there and why.
-2. A detailed English image generation prompt (1 paragraph, ~60–80 words) describing
-   the visual scene for an AI image generator. Focus on: setting/buildings, time of day,
-   atmosphere, people, what is visible at ground level. No meta-commentary.
+_ROLE_STANDARD = """\
+ROLE: Expert Historical Photographer & Geographer.
+INPUT DATA:
+Location: {lat}, {lon}
+Details: "{location_name}"
+Date: {year} {era}
+Season: {season} (Month: {month})
 
-Return ONLY a JSON object with exactly these keys:
+TASK: Analyze the location and time period. Create a highly detailed visual description for an AI image generator.
+
+VISUAL GUIDELINES:
+1. Historical Accuracy: What buildings existed? What was the landscape? (e.g., dirt roads vs paved, specific architecture styles).
+2. Photography Style:
+   - 2024+: Digital, sharp, 4k.
+   - 1980s: Film grain, Kodachrome palette.
+   - 1860s: Daguerreotype, vignette, long exposure blur.
+   - Pre-1839: Hyper-realistic cinematic render or matte painting.
+3. Environment: Strictly apply the season ({season}). If Winter, show snow/mud/bare trees. If Summer, lush vegetation/dust.
+4. Lighting & Atmosphere: Define the mood (e.g., "Golden Hour", "Overcast", "Gaslamp lit").\
+"""
+
+_ROLE_SELFIE = """\
+ROLE: Time Travel Scenographer.
+INPUT DATA:
+Location: {lat}, {lon}
+Details: "{location_name}"
+Date: {year} {era}
+Season: {season} (Month: {month})
+
+TASK: Create a visual description for a "Time Travel Selfie".
+VISUAL GUIDELINES:
+1. Subject: A typical person from this era (e.g., Roman Centurion, Medieval Peasant, 1920s Flapper).
+2. Pose: The subject is in the foreground, looking into the "lens", arm extended or holding a device (if applicable) or just posing close-up.
+3. Background: The specific historical location must be visible and recognizable behind the subject.
+4. Style: Consistent with the era's visual technology (or hyper-realistic render if pre-camera).\
+"""
+
+_ROLE_ART = """\
+ROLE: Art Historian.
+INPUT DATA:
+Location: {lat}, {lon}
+Details: "{location_name}"
+Date: {year} {era}
+Season: {season} (Month: {month})
+
+TASK: Describe an artwork that could have been created in this place at this time.
+VISUAL GUIDELINES:
+1. Medium & Style: Choose the dominant style of the era (e.g., Cave Painting, Egyptian Fresco, Roman Mosaic,
+   Medieval Tapestry, Oil Painting, Ukiyo-e).
+2. Technique: Describe brushstrokes, material texture (canvas, stone, papyrus), and color palette.
+3. Subject: Depict the location or a typical event through the eyes of an artist of that time.\
+"""
+
+_FINAL_OUTPUT = """\
+
+FINAL OUTPUT INSTRUCTION:
+Provide a JSON object containing the historical details and a **visual_prompt** field.
+The 'visual_prompt' field must contain the FULL, FINAL, ENGLISH text description to be sent
+directly to the Image Generator.
+
+Required JSON Structure:
+{{
+  "title": "Russian title for the historical card (max 10 words)",
+  "description": "Russian historical description (3 sentences, vivid and specific)",
+  "visual_prompt": "Detailed English text prompt describing the scene, objects, lighting, style, and camera. Include ALL historical details here.",
+  "suggestions": [
+    {{"label": "Russian label", "year": 1200, "era": "CE", "type": "time", "lat": {lat}, "lng": {lon}}},
+    {{"label": "Russian label", "year": 44, "era": "BCE", "type": "time", "lat": {lat}, "lng": {lon}}}
+  ]
+}}
+OUTPUT JSON ONLY. No markdown fences, no commentary.\
+"""
+
+_STRUCTURAL_BLOCK = """\
+CRITICAL INSTRUCTION: STRUCTURAL & COMPOSITIONAL PRESERVATION.
+The provided image is the GEOMETRIC BLUEPRINT. You MUST strictly adhere to the composition,
+perspective, camera angle, and building layout of this image.
+
+YOUR TASK: "Re-skin" this exact scene to the year {year} {era}.
+1. KEEP: The main shapes, silhouettes, and spatial arrangement of objects. Do not rotate the camera.
+2. REPLACE: Modern materials with era-appropriate ones (e.g., asphalt -> dirt/cobblestone,
+   glass -> wood/stone/air).
+3. ADAPT: If there are modern objects (cars, poles), replace them with era-equivalents
+   (carriages, trees) or remove them, but maintain the depth and scale of the scene.
+
+TARGET STYLE DESCRIPTION:
+{visual_prompt}\
+"""
+
+_LUCKY_PROMPT = """\
+Task: Pick a random, visually spectacular, and non-banal historical event or location.
+Avoid cliché examples like Pyramids or Eiffel Tower. Think: "Tunguska Event",
+"Library of Alexandria at peak", "Woodstock 1969", "Tenochtitlan 1519", "Constantinople 537 CE",
+"Pompeii hours before eruption", "Battle of Agincourt", "Opening of Suez Canal".
+
+Return strictly JSON:
 {
-  "historical_text": "<narrative in requested language>",
-  "image_prompt": "<English image gen prompt>"
-}"""
+  "lat": number,
+  "lng": number,
+  "year": number,
+  "era": "BCE" or "CE",
+  "month": number (1-12, optional),
+  "hasSpecificDate": boolean,
+  "locationDetail": "Specific name of the place/event in Russian"
+}
+OUTPUT JSON ONLY.\
+"""
 
 
-def _build_user_message(
-    location_ctx: LocationContext,
+# ── Build prompt ───────────────────────────────────────────────────────────────
+
+
+def _build_analysis_prompt(
+    lat: float,
+    lon: float,
+    location_name: str,
     year: int,
     era: str,
+    month: int | None,
     style: str,
-    language: str,
 ) -> str:
-    year_str = _year_for_prompt(year, era)
-    lang_label = "Russian" if language == "ru" else "English"
+    season = _get_season(month)
+    month_str = str(month) if month else "unknown"
+    year_s = _year_str(year, era)
 
-    lines = [
-        f"Location: {location_ctx.name}",
-        f"Coordinates: ({location_ctx.name})",
-        f"Target year: {year_str}",
-        f"Art style requested: {style}",
-        f"Language for historical_text: {lang_label}",
-        "",
-    ]
-
-    if location_ctx.wikipedia_summary:
-        lines.append(f"Wikipedia context: {location_ctx.wikipedia_summary[:800]}")
-    if location_ctx.start_date:
-        lines.append(f"Construction date: {location_ctx.start_date}")
-    if location_ctx.architect:
-        lines.append(f"Architect: {location_ctx.architect}")
-    if location_ctx.historic:
-        lines.append(f"Historic type: {location_ctx.historic}")
-
-    lines.append("\nGenerate the JSON with historical_text and image_prompt as specified.")
-    return "\n".join(lines)
-
-
-async def _call_llm(
-    location_ctx: LocationContext,
-    year: int,
-    era: str,
-    style: str,
-    language: str,
-) -> dict[str, Any]:
-    """Call GPT-4.1 to get historical narrative + image prompt."""
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": _SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": _build_user_message(location_ctx, year, era, style, language),
-        },
-    ]
-    response = await _get_client().create_completion(
-        messages=messages,
-        model=_LLM_MODEL,
+    role_template = {"photorealistic": _ROLE_STANDARD, "selfie": _ROLE_SELFIE, "art": _ROLE_ART}.get(
+        style, _ROLE_STANDARD
     )
-    raw = response.choices[0].message.content or "{}"
+    role = role_template.format(
+        lat=lat,
+        lon=lon,
+        location_name=location_name,
+        year=year_s,
+        era=era,
+        season=season,
+        month=month_str,
+    )
+    final = _FINAL_OUTPUT.format(lat=lat, lon=lon)
+    return role + "\n\n" + final
 
-    # Strip markdown fences if present
+
+# ── Gemini analysis call ───────────────────────────────────────────────────────
+
+
+async def _call_gemini_analysis(prompt: str) -> dict[str, Any]:
+    """Call Gemini 3 Pro (with Google Search Grounding) for historical analysis."""
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY / GOOGLE_API_KEY not set")
+
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=api_key)
+
+    # Try the primary model, fall back on 404/unavailable
+    for model in (_ANALYSIS_MODEL, _ANALYSIS_FALLBACK):
+        try:
+            logger.info("time_travel_gen_001: analysis with \033[36m%s\033[0m", model)
+            resp = await client.aio.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[types.Tool(google_search=types.GoogleSearch())],
+                    temperature=0.7,
+                ),
+            )
+            raw = resp.candidates[0].content.parts[0].text or "{}"
+            break
+        except Exception as e:
+            logger.warning("time_travel_gen_002: %s failed (%s), trying fallback", model, e)
+    else:
+        # Both Gemini models failed — fall back to OpenRouter GPT-4.1
+        logger.warning("time_travel_gen_003: Gemini analysis unavailable, using OpenRouter fallback")
+        raw = await _openrouter_fallback(prompt)
+
+    return _parse_json(raw)
+
+
+async def _openrouter_fallback(prompt: str) -> str:
+    """Fallback: use OpenRouter GPT-4.1 for analysis (no grounding)."""
+    from app.backend.openrouter_client import OpenRouterClient
+
+    client = OpenRouterClient()
+    resp = await client.create_completion(
+        messages=[{"role": "user", "content": prompt}],
+        model="openai/gpt-4.1",
+    )
+    return resp.choices[0].message.content or "{}"
+
+
+def _parse_json(raw: str) -> dict[str, Any]:
     raw = raw.strip()
     if raw.startswith("```"):
         lines = raw.split("\n")
         raw = "\n".join(lines[1:-1]) if len(lines) > 2 else raw
-
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
-        logger.warning("time_travel_gen_001: LLM returned non-JSON: %s", raw[:200])
-        return {
-            "historical_text": raw,
-            "image_prompt": f"Historical view of {location_ctx.name} in {_year_for_prompt(year, era)}",
-        }
+        logger.warning("time_travel_gen_004: non-JSON response (len=%d)", len(raw))
+        return {"title": "", "description": raw[:400], "visual_prompt": raw, "suggestions": []}
 
 
-# ── Main entry point ───────────────────────────────────────────────────────────
+# ── Lucky (random event) ───────────────────────────────────────────────────────
+
+
+async def generate_lucky() -> LuckyResponse:
+    """Pick a random spectacular historical event."""
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY / GOOGLE_API_KEY not set")
+
+    from google import genai
+
+    client = genai.Client(api_key=api_key)
+
+    for model in (_ANALYSIS_MODEL, _ANALYSIS_FALLBACK):
+        try:
+            resp = await client.aio.models.generate_content(
+                model=model,
+                contents=_LUCKY_PROMPT,
+            )
+            raw = resp.candidates[0].content.parts[0].text or "{}"
+            break
+        except Exception as e:
+            logger.warning("time_travel_gen_lucky_001: %s failed: %s", model, e)
+    else:
+        raise RuntimeError("All Gemini models unavailable for lucky request")
+
+    data = _parse_json(raw)
+    return LuckyResponse(
+        lat=float(data["lat"]),
+        lng=float(data["lng"]),
+        year=int(data["year"]),
+        era=data.get("era", "CE"),
+        location_detail=data.get("locationDetail", ""),
+    )
+
+
+# ── Main pipeline ──────────────────────────────────────────────────────────────
 
 
 async def generate_time_travel(request: TimeTravelRequest) -> TimeTravelResponse:
-    """Full pipeline: geocode → LLM → image → response."""
+    """Full pipeline: geocode → Gemini analysis → image → response."""
     logger.info(
-        "time_travel_gen_002: lat=%.4f lon=%.4f year=%d %s style=%s",
+        "time_travel_gen_005: lat=%.4f lon=%.4f year=%d %s style=%s model=%s",
         request.latitude,
         request.longitude,
         request.year,
         request.era,
         request.style,
+        request.image_model,
     )
 
     # Step 1: geocode
@@ -157,49 +320,74 @@ async def generate_time_travel(request: TimeTravelRequest) -> TimeTravelResponse
         location_ctx = LocationContext(name=f"{request.latitude:.4f}, {request.longitude:.4f}")
 
     era_label = _format_era(request.year, request.era, request.language)
-    logger.info("time_travel_gen_003: location=%r  era=%s", location_ctx.name, era_label)
+    logger.info("time_travel_gen_006: location=%r  era=%s", location_ctx.name, era_label)
 
-    # Step 2: LLM → historical text + image prompt
+    # Step 2: Gemini analysis → {title, description, visual_prompt, suggestions}
     try:
-        llm_result = await _call_llm(
-            location_ctx=location_ctx,
+        prompt = _build_analysis_prompt(
+            lat=request.latitude,
+            lon=request.longitude,
+            location_name=location_ctx.name,
             year=request.year,
             era=request.era,
+            month=request.month,
             style=request.style,
-            language=request.language,
         )
-        historical_text = llm_result.get("historical_text", "")
-        image_prompt = llm_result.get("image_prompt", "")
+        llm = await _call_gemini_analysis(prompt)
     except Exception as e:
-        logger.error("time_travel_gen_error_002: LLM failed: %s", e, exc_info=True)
-        historical_text = ""
-        image_prompt = (
-            f"Historical view of {location_ctx.name}, {_year_for_prompt(request.year, request.era)}"
-        )
+        logger.error("time_travel_gen_error_002: analysis failed: %s", e, exc_info=True)
+        llm = {
+            "title": "",
+            "description": "",
+            "visual_prompt": (
+                f"Historical view of {location_ctx.name}, "
+                f"{_year_str(request.year, request.era)}, "
+                f"{request.style} style"
+            ),
+            "suggestions": [],
+        }
+
+    visual_prompt: str = llm.get("visual_prompt", "")
+    title: str = llm.get("title", "")
+    description: str = llm.get("description", "")
+    suggestions: list[dict[str, Any]] = llm.get("suggestions", [])
 
     logger.info(
-        "time_travel_gen_004: LLM done  text_len=%d  prompt_len=%d",
-        len(historical_text),
-        len(image_prompt),
+        "time_travel_gen_007: analysis done  title=%r  prompt_len=%d  suggestions=%d",
+        title,
+        len(visual_prompt),
+        len(suggestions),
     )
 
-    # Step 3: image generation
+    # Step 3: for reference photos, wrap prompt with structural preservation block
+    image_prompt = visual_prompt
+    if request.reference_image_b64:
+        image_prompt = _STRUCTURAL_BLOCK.format(
+            year=_year_str(request.year, request.era),
+            era=request.era,
+            visual_prompt=visual_prompt,
+        )
+
+    # Step 4: image generation
     image_data, image_mime = await generate_image(
         image_prompt=image_prompt,
         style=request.style,
         reference_image_b64=request.reference_image_b64,
+        model_tier=request.image_model,
     )
 
     if image_data:
-        logger.info("time_travel_gen_005: image generated  mime=%s  b64_len=%d", image_mime, len(image_data))
+        logger.info("time_travel_gen_008: image ok  mime=%s  b64_len=%d", image_mime, len(image_data))
     else:
-        logger.warning("time_travel_gen_006: image generation returned None")
+        logger.warning("time_travel_gen_009: image generation returned None")
 
     return TimeTravelResponse(
         image_data=image_data,
         image_mime=image_mime or "image/jpeg",
-        historical_text=historical_text,
+        title=title,
+        historical_text=description,
         image_prompt=image_prompt,
         era_label=era_label,
         location_name=location_ctx.name,
+        suggestions=suggestions,
     )

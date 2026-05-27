@@ -236,6 +236,20 @@
       object-fit: cover;
     }
 
+    /* ── Lucky button ────────────────────────── */
+    #lucky-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--hint);
+      padding: 12px;
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.15s;
+    }
+    #lucky-btn:active { opacity: 0.7; }
+
     /* ── Generate button (fallback, shown if Telegram MainButton unavailable) */
     #generate-btn-fallback {
       background: var(--btn-bg);
@@ -445,6 +459,20 @@
     </button>
   </div>
 
+  <!-- Model quality -->
+  <div class="section-label">Качество</div>
+  <div class="style-grid">
+    <button class="style-btn" id="model-fast" onclick="setImageModel('fast')">
+      <span class="style-icon">⚡</span>Быстро
+    </button>
+    <button class="style-btn active" id="model-balanced" onclick="setImageModel('balanced')">
+      <span class="style-icon">✨</span>Баланс
+    </button>
+    <button class="style-btn" id="model-quality" onclick="setImageModel('quality')">
+      <span class="style-icon">🏆</span>Флагман
+    </button>
+  </div>
+
   <!-- My street (img2img) -->
   <div class="section-label">Моя улица <span style="color:var(--hint);font-weight:400;text-transform:none;font-size:11px">(необязательно)</span></div>
   <div class="my-street-section">
@@ -456,6 +484,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Lucky button -->
+  <button id="lucky-btn" onclick="goLucky()">🎲 Мне повезёт</button>
 
   <!-- Fallback generate button (hidden if Telegram MainButton is available) -->
   <button id="generate-btn-fallback" onclick="startGeneration()">
@@ -485,7 +516,14 @@
       <div class="result-era" id="result-era-badge">⏳ …</div>
     </div>
     <div class="result-location" id="result-location-text"></div>
+    <div id="result-title" style="font-size:17px;font-weight:700;line-height:1.3;display:none"></div>
     <div class="result-text" id="result-text"></div>
+
+    <!-- Related suggestions -->
+    <div id="suggestions-wrap" style="display:none;flex-direction:column;gap:8px">
+      <div class="section-label" style="margin-top:4px">Похожие эпохи</div>
+      <div id="suggestions-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
 
     <div class="result-actions">
       <button class="action-btn" onclick="goBack()">← Назад</button>
@@ -514,6 +552,7 @@
     year: 1462,
     era: 'CE',
     style: 'photorealistic',
+    imageModel: 'balanced',
     referenceImageB64: null,
     lastResult: null,
   };
@@ -634,6 +673,35 @@
     document.getElementById('style-' + style).classList.add('active');
   }
 
+  // ── Image model tier ───────────────────────────────────────────────────────
+  function setImageModel(tier) {
+    state.imageModel = tier;
+    ['fast', 'balanced', 'quality'].forEach(t => {
+      document.getElementById('model-' + t).classList.toggle('active', t === tier);
+    });
+  }
+
+  // ── Lucky (random event) ───────────────────────────────────────────────────
+  async function goLucky() {
+    const btn = document.getElementById('lucky-btn');
+    btn.textContent = '🎲 Ищем событие…';
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API_BASE}/time-travel/lucky`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setLocation(data.lat, data.lng, data.location_detail);
+      setPreset(data.year, data.era);
+      // Auto-generate immediately
+      await startGeneration();
+    } catch (e) {
+      showError(`Ошибка: ${e.message}`);
+    } finally {
+      btn.textContent = '🎲 Мне повезёт';
+      btn.disabled = false;
+    }
+  }
+
   // ── Photo upload ───────────────────────────────────────────────────────────
   function onPhotoSelected(input) {
     const file = input.files?.[0];
@@ -737,6 +805,7 @@
         year: state.year,
         era: state.era,
         style: state.style,
+        image_model: state.imageModel,
         language: 'ru',
       };
       if (state.referenceImageB64) {
@@ -784,7 +853,35 @@
     // Text
     document.getElementById('result-era-badge').textContent = `⏳ ${data.era_label}`;
     document.getElementById('result-location-text').textContent = `📍 ${data.location_name}`;
+    const titleEl = document.getElementById('result-title');
+    if (data.title) {
+      titleEl.textContent = data.title;
+      titleEl.style.display = '';
+    } else {
+      titleEl.style.display = 'none';
+    }
     document.getElementById('result-text').textContent = data.historical_text;
+
+    // Suggestions
+    const suggestionsWrap = document.getElementById('suggestions-wrap');
+    const suggestionsList = document.getElementById('suggestions-list');
+    suggestionsList.innerHTML = '';
+    if (data.suggestions?.length) {
+      data.suggestions.slice(0, 4).forEach(s => {
+        const btn = document.createElement('button');
+        btn.style.cssText = 'background:var(--secondary-bg);border:1px solid var(--border);border-radius:999px;color:var(--text);padding:6px 14px;font-size:13px;cursor:pointer;white-space:nowrap';
+        btn.textContent = s.label;
+        btn.onclick = () => {
+          setLocation(s.lat || state.lat, s.lng || state.lon, null);
+          setPreset(s.year, s.era);
+          goBack();
+        };
+        suggestionsList.appendChild(btn);
+      });
+      suggestionsWrap.style.display = 'flex';
+    } else {
+      suggestionsWrap.style.display = 'none';
+    }
 
     // Show save/share button only if there's an image
     const saveBtn = document.getElementById('save-btn');

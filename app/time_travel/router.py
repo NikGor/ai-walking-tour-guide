@@ -13,8 +13,8 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 
-from app.time_travel.generator import generate_time_travel
-from app.time_travel.models import SendToChatRequest, TimeTravelRequest, TimeTravelResponse
+from app.time_travel.generator import generate_lucky, generate_time_travel
+from app.time_travel.models import LuckyResponse, SendToChatRequest, TimeTravelRequest, TimeTravelResponse
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,16 @@ async def generate(request: TimeTravelRequest) -> TimeTravelResponse:
             location_name="",
             error=str(e),
         )
+
+
+@router.post("/lucky", response_model=LuckyResponse)
+async def lucky() -> LuckyResponse:
+    """Return a random spectacular historical event (location + date)."""
+    try:
+        return await generate_lucky()
+    except Exception as e:
+        logger.error("time_travel_route_error_lucky: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # ── Send to Telegram chat ──────────────────────────────────────────────────────
