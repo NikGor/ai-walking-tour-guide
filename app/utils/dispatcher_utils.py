@@ -7,6 +7,7 @@ from typing import Any
 from app.agent.tools.city_tour_tool import city_tour_tool
 from app.agent.tools.google_places_search_tool import google_places_search_tool
 from app.agent.tools.google_search_tool import google_search_tool
+from app.agent.tools.image_gen_tool import generate_image_tool
 
 logger = logging.getLogger(__name__)
 
@@ -61,5 +62,11 @@ async def execute_tool(
             indent=2,
         )
         return llm_summary, map_png
+
+    if name == "generate_image":
+        image_bytes = await generate_image_tool(args["prompt"])
+        if image_bytes:
+            return "Image generated successfully.", image_bytes
+        return "Image generation failed.", None
 
     return f"Unknown tool: {name}", None

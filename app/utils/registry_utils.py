@@ -94,6 +94,32 @@ _TOOLS: list[dict] = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "generate_image",
+        "description": (
+            "Generate an image when the user explicitly asks to see something visual: "
+            "a dish, a historical object, an animal, a place, a person's appearance, etc. "
+            "Use when the user says 'покажи', 'как выглядит', 'нарисуй', 'покажи мне', "
+            "'что это такое визуально', or any equivalent in any language. "
+            "Write a vivid, specific English prompt describing exactly what to render. "
+            "Do NOT call this for maps or city tours — use plan_city_tour for those."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": (
+                        "Detailed English image prompt. Be specific: include style, "
+                        "lighting, composition. E.g. 'Bouillabaisse fish stew in a white bowl, "
+                        "saffron broth, rustic French restaurant, natural light, top-down view'."
+                    ),
+                }
+            },
+            "required": ["prompt"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
 
