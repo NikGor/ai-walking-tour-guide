@@ -20,6 +20,37 @@ _TTS_VOICE = "alloy"  # neutral/academic; good for Russian long-form narrative
 # ~1500 chars ≈ 70–80 s of audio — comfortable Telegram voice message length.
 _MAX_CHARS = 1500
 
+_PERSONA_INSTRUCTIONS: dict[str, str] = {
+    "historian": (
+        "You are a composed academic historian narrating in Russian. "
+        "Speak clearly and steadily, with measured pacing. Thoughtful, authoritative tone."
+    ),
+    "architecture_expert": (
+        "You are an architecture expert narrating in Russian. "
+        "Speak with focused precision and quiet enthusiasm, as if explaining a blueprint."
+    ),
+    "roman_empire": (
+        "You are narrating in Russian about the Roman Empire. "
+        "Speak with gravitas and grandeur, like a senator recounting ancient glory."
+    ),
+    "storyteller": (
+        "You are a theatrical storyteller narrating in Russian. "
+        "Be expressive and vivid — vary your pace, build tension, let moments land."
+    ),
+    "medieval_resident": (
+        "You are narrating in Russian as a medieval townsperson. "
+        "Speak in a warm, earthy tone, as if recounting life from memory."
+    ),
+    "military_expert": (
+        "You are a military historian narrating in Russian. "
+        "Speak crisply and directly, with the disciplined cadence of a field briefing."
+    ),
+    "deep_time": (
+        "You are narrating vast geological timescales in Russian. "
+        "Speak slowly and with awe, as if contemplating epochs beyond human memory."
+    ),
+}
+
 
 def _strip_markup(text: str) -> str:
     """Remove HTML/Markdown/entities before sending to TTS."""
@@ -29,7 +60,7 @@ def _strip_markup(text: str) -> str:
     return text.strip()
 
 
-async def synthesise(text: str) -> bytes | None:
+async def synthesise(text: str, persona: str = "historian") -> bytes | None:
     """Convert text to MP3 bytes via OpenRouter TTS.
 
     Returns None if OPENROUTER_API_KEY is not set or synthesis fails.
@@ -50,6 +81,7 @@ async def synthesise(text: str) -> bytes | None:
         "voice": _TTS_VOICE,
         "input": clean,
         "response_format": "mp3",
+        "instructions": _PERSONA_INSTRUCTIONS.get(persona, _PERSONA_INSTRUCTIONS["historian"]),
     }
     headers = {
         "Authorization": f"Bearer {api_key}",

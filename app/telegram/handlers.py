@@ -737,7 +737,7 @@ async def _dispatch(
     if session.get("voice") and reply and not reply.startswith("⚠️"):
         from app.telegram.tts import synthesise
 
-        audio = await synthesise(reply)
+        audio = await synthesise(reply, persona=session.get("persona", "historian"))
         if audio:
             voice_file = BufferedInputFile(audio, filename="voice.mp3")
             await message.answer_voice(voice=voice_file)
