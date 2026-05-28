@@ -1,23 +1,32 @@
-"""Gemini-powered image generation for the Time Travel Lens."""
+"""OpenRouter-powered image generation for the Time Travel Lens.
 
-import base64
+Replaces the former google-genai SDK implementation.
+Uses OPENROUTER_API_KEY only — no GEMINI_API_KEY / GOOGLE_API_KEY needed.
+"""
+
 import logging
 import os
-from typing import Any
+import re
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
-# Image generation model tiers (user's "Nano Banana" naming convention)
-_IMAGE_MODELS = {
-    "fast": "gemini-2.5-flash-image",  # Nano Banana — fastest
-    "balanced": "gemini-3.1-flash-image-preview",  # Nano Banana 2 — optimized
-    "quality": "gemini-3-pro-image-preview",  # Nano Banana Pro — flagship
+_OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Model tiers mapped to OpenRouter model IDs (Gemini image family)
+_IMAGE_MODELS: dict[str, str] = {
+    "fast": "google/gemini-2.5-flash-image",
+    "balanced": "google/gemini-3.1-flash-image-preview",
+    "quality": "google/gemini-3-pro-image-preview",
 }
-_IMAGE_FALLBACK_CHAIN = [
-    "gemini-2.5-flash-image",
-    "gemini-3.1-flash-image-preview",
+
+# Fallback order when the primary model fails
+_FALLBACK_CHAIN: list[str] = [
+    "google/gemini-2.5-flash-image",
+    "google/gemini-3.1-flash-image-preview",
+    "google/gemini-3-pro-image-preview",
 ]
-_IMAGEN_MODEL = "imagen-4.0-fast-generate-001"
 
 
 def _style_suffix(style: str) -> str:
@@ -41,180 +50,145 @@ def _style_suffix(style: str) -> str:
     )
 
 
+def _build_messages(prompt: str, reference_image_b64: str | None) -> list[dict]:
+    """Build the OpenRouter messages payload."""
+    if reference_image_b64:
+        # img2img: send text prompt + reference image together
+        return [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{reference_image_b64}"},
+                    },
+                ],
+            }
+        ]
+    return [{"role": "user", "content": prompt}]
+
+
+def _extract_image(response_json: dict) -> tuple[str | None, str]:
+    """Pull the first image out of an OpenRouter chat-completions response.
+
+    Response content is an array of typed parts:
+      {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+    or occasionally a plain string when only text was returned.
+    """
+    try:
+        choices = response_json.get("choices", [])
+        if not choices:
+            logger.warning("time_travel_img_008: no choices in response")
+            return None, ""
+
+        content = choices[0].get("message", {}).get("content")
+        if not content:
+            logger.warning("time_travel_img_008b: empty message content")
+            return None, ""
+
+        # content can be a list of parts or a plain string
+        parts = content if isinstance(content, list) else [{"type": "text", "text": content}]
+
+        for part in parts:
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") == "image_url":
+                url = part.get("image_url", {}).get("url", "")
+                # url is "data:<mime>;base64,<data>"
+                m = re.match(r"data:([^;]+);base64,(.+)", url, re.DOTALL)
+                if m:
+                    mime, img_b64 = m.group(1), m.group(2).strip()
+                    logger.info(
+                        "time_travel_img_009: extracted image  mime=%s  b64_len=%d",
+                        mime,
+                        len(img_b64),
+                    )
+                    return img_b64, mime
+
+        logger.warning("time_travel_img_010: no image_url part found in response")
+        return None, ""
+
+    except Exception as e:
+        logger.error("time_travel_img_error_004: extraction failed: %s", e, exc_info=True)
+        return None, ""
+
+
+async def _call_openrouter(
+    client: httpx.AsyncClient,
+    model: str,
+    messages: list[dict],
+    api_key: str,
+) -> dict:
+    """Single OpenRouter chat-completions call. Returns parsed JSON or raises."""
+    payload = {
+        "model": model,
+        "modalities": ["image", "text"],
+        "messages": messages,
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    resp = await client.post(_OPENROUTER_URL, json=payload, headers=headers, timeout=60.0)
+    resp.raise_for_status()
+    return resp.json()
+
+
 async def generate_image(
     image_prompt: str,
     style: str = "photorealistic",
     reference_image_b64: str | None = None,
     model_tier: str = "balanced",
 ) -> tuple[str | None, str]:
-    """Generate a historical scene image.
+    """Generate a historical scene image via OpenRouter.
 
-    model_tier: "fast" | "balanced" | "quality"
-    Returns (base64_image_data, mime_type).
-    Returns (None, "") on failure.
+    Args:
+        image_prompt: Full text prompt for the scene.
+        style: "photorealistic" | "selfie" | "art"
+        reference_image_b64: Optional base64 reference photo for img2img.
+        model_tier: "fast" | "balanced" | "quality"
+
+    Returns:
+        (base64_image_data, mime_type) — or (None, "") on failure.
     """
-    # Accept either GEMINI_API_KEY or GOOGLE_API_KEY (Railway may only have one of them)
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        logger.error("time_travel_img_001: neither GEMINI_API_KEY nor GOOGLE_API_KEY is set")
+        logger.error("time_travel_img_001: OPENROUTER_API_KEY is not set")
         return None, ""
 
-    # For reference photos the structural preservation block is already in the prompt,
-    # so don't add a style suffix (it may conflict with the structural instructions).
+    # For reference photos the structural preservation block is already in the prompt;
+    # don't append a style suffix as it may conflict with those structural instructions.
     full_prompt = image_prompt if reference_image_b64 else image_prompt + _style_suffix(style)
 
-    primary_model = _IMAGE_MODELS.get(model_tier, _IMAGE_MODELS["balanced"])
+    messages = _build_messages(full_prompt, reference_image_b64)
 
-    try:
-        from google import genai
-        from google.genai import types
+    # Build fallback chain: requested model first, then the rest
+    primary = _IMAGE_MODELS.get(model_tier, _IMAGE_MODELS["balanced"])
+    candidates = [primary] + [m for m in _FALLBACK_CHAIN if m != primary]
 
-        client = genai.Client(api_key=api_key)
-
-        if reference_image_b64:
-            # img2img: use reference photo + transform to historical era
-            return await _generate_with_reference(
-                client, types, full_prompt, reference_image_b64, primary_model
+    async with httpx.AsyncClient() as client:
+        for model in candidates:
+            logger.info(
+                "time_travel_img_002: generating with \033[36m%s\033[0m  img2img=%s  prompt_len=%d",
+                model,
+                bool(reference_image_b64),
+                len(full_prompt),
             )
-        else:
-            return await _generate_text_to_image(client, types, full_prompt, primary_model)
-
-    except Exception as e:
-        logger.error("time_travel_img_error_001: %s", e, exc_info=True)
-        return None, ""
-
-
-async def _generate_text_to_image(
-    client: Any,
-    types: Any,
-    prompt: str,
-    model: str,
-) -> tuple[str | None, str]:
-    """Generate image from text prompt, with automatic fallback through model chain."""
-    # Build the fallback list: requested model first, then chain, skipping duplicates
-    candidates = [model] + [m for m in _IMAGE_FALLBACK_CHAIN if m != model]
-
-    for candidate in candidates:
-        logger.info(
-            "time_travel_img_002: Generating with \033[36m%s\033[0m  prompt_len=%d",
-            candidate,
-            len(prompt),
-        )
-        try:
-            response = await client.aio.models.generate_content(
-                model=candidate,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE", "TEXT"],
-                ),
-            )
-            result = _extract_image_from_response(response)
-            if result[0]:
-                return result
-        except Exception as e:
-            logger.warning("time_travel_img_003: %s failed (%s)", candidate, e)
-
-    # All Gemini image models failed → try Imagen 4
-    return await _generate_with_imagen4(client, types, prompt)
-
-
-async def _generate_with_reference(
-    client: Any,
-    types: Any,
-    prompt: str,
-    reference_image_b64: str,
-    model: str,
-) -> tuple[str | None, str]:
-    """img2img: transform a reference photo to a historical era."""
-    logger.info("time_travel_img_004: img2img with \033[36m%s\033[0m", model)
-    candidates = [model] + [m for m in _IMAGE_FALLBACK_CHAIN if m != model]
-
-    for candidate in candidates:
-        try:
-            image_bytes = base64.b64decode(reference_image_b64)
-            contents = [
-                types.Part.from_text(text=prompt),
-                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-            ]
-            response = await client.aio.models.generate_content(
-                model=candidate,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE", "TEXT"],
-                ),
-            )
-            result = _extract_image_from_response(response)
-            if result[0]:
-                return result
-        except Exception as e:
-            logger.warning("time_travel_img_error_002: img2img %s failed: %s", candidate, e)
-
-    return None, ""
-
-
-async def _generate_with_imagen4(
-    client: Any,
-    types: Any,
-    prompt: str,
-) -> tuple[str | None, str]:
-    """Last-resort fallback: generate with Imagen 4 Fast."""
-    logger.info("time_travel_img_005: Trying Imagen 4 fallback")
-    try:
-        response = await client.aio.models.generate_images(
-            model=_IMAGEN_MODEL,
-            prompt=prompt,
-            config=types.GenerateImagesConfig(
-                number_of_images=1,
-                aspect_ratio="16:9",
-            ),
-        )
-        imgs = response.generated_images
-        if imgs and imgs[0].image and imgs[0].image.image_bytes:
-            img_b64 = base64.b64encode(imgs[0].image.image_bytes).decode()
-            logger.info("time_travel_img_006: Imagen 3 succeeded, %d bytes", len(imgs[0].image.image_bytes))
-            return img_b64, "image/jpeg"
-        logger.warning("time_travel_img_007: Imagen 3 returned no images")
-        return None, ""
-    except Exception as e:
-        logger.error("time_travel_img_error_003: Imagen 3 failed: %s", e, exc_info=True)
-        return None, ""
-
-
-def _extract_image_from_response(response: object) -> tuple[str | None, str]:
-    """Pull the first image part out of a Gemini generate_content response."""
-    try:
-        candidates = getattr(response, "candidates", [])
-        if not candidates:
-            logger.warning("time_travel_img_008: No candidates in response")
-            return None, ""
-
-        content = getattr(candidates[0], "content", None)
-        if not content or not getattr(content, "parts", None):
-            logger.warning(
-                "time_travel_img_008b: candidate has no content/parts "
-                "(likely safety filter or empty response)"
-            )
-            return None, ""
-
-        for part in content.parts:
-            inline = getattr(part, "inline_data", None)
-            if inline and getattr(inline, "data", None):
-                data = inline.data
-                mime = getattr(inline, "mime_type", "image/jpeg")
-                # data may already be base64 string or raw bytes
-                if isinstance(data, (bytes, bytearray)):
-                    img_b64 = base64.b64encode(data).decode()
-                else:
-                    img_b64 = data  # already base64
-                logger.info(
-                    "time_travel_img_009: Extracted image  mime=%s  b64_len=%d",
-                    mime,
-                    len(img_b64),
+            try:
+                response_json = await _call_openrouter(client, model, messages, api_key)
+                img_b64, mime = _extract_image(response_json)
+                if img_b64:
+                    return img_b64, mime
+                logger.warning("time_travel_img_003: %s returned no image — trying next", model)
+            except httpx.HTTPStatusError as e:
+                logger.warning(
+                    "time_travel_img_003: %s HTTP %d — trying next",
+                    model,
+                    e.response.status_code,
                 )
-                return img_b64, mime
+            except Exception as e:
+                logger.warning("time_travel_img_003: %s failed (%s) — trying next", model, e)
 
-        logger.warning("time_travel_img_010: No inline_data found in response parts")
-        return None, ""
-    except Exception as e:
-        logger.error("time_travel_img_error_004: extraction failed: %s", e, exc_info=True)
-        return None, ""
+    logger.error("time_travel_img_error_001: all image models exhausted, returning None")
+    return None, ""

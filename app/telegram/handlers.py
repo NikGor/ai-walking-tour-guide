@@ -394,8 +394,7 @@ async def cmd_voice(message: Message) -> None:
     if new_state:
         await message.answer(
             "🔊 <b>Голосовой режим включён</b>\n\n"
-            "Ответы будут отправляться как голосовые сообщения.\n"
-            "Требуется <code>OPENAI_API_KEY</code>.\n\n"
+            "Ответы будут отправляться как голосовые сообщения.\n\n"
             "/voice — выключить"
         )
     else:
