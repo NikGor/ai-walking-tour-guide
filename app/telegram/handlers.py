@@ -702,16 +702,25 @@ async def _dispatch(
 
     await thinking.delete()
 
-    # ── Wikipedia image ───────────────────────────────────────────────────────
+    # ── Wikipedia image (context thumbnail — no caption, text follows separately) ──
     if wiki_image:
         await message.answer_photo(photo=BufferedInputFile(wiki_image, filename="wiki.jpg"))
 
-    # ── Map image (city tour) ─────────────────────────────────────────────────
+    # ── Map / generated image — send with text as caption ────────────────────
     if map_image:
-        map_file = BufferedInputFile(map_image, filename="tour_map.png")
-        await message.answer_photo(photo=map_file)
-
-    await message.answer(reply, parse_mode=_parse_mode(fmt), reply_markup=markup)
+        parse_mode = _parse_mode(fmt)
+        if len(reply) <= 1024:
+            await message.answer_photo(
+                photo=BufferedInputFile(map_image, filename="image.jpg"),
+                caption=reply,
+                parse_mode=parse_mode,
+                reply_markup=markup,
+            )
+        else:
+            await message.answer_photo(photo=BufferedInputFile(map_image, filename="image.jpg"))
+            await message.answer(reply, parse_mode=parse_mode, reply_markup=markup)
+    else:
+        await message.answer(reply, parse_mode=_parse_mode(fmt), reply_markup=markup)
 
     # ── Voice mode ────────────────────────────────────────────────────────────
     if session.get("voice") and reply and not reply.startswith("⚠️"):
