@@ -5,7 +5,7 @@ from sqlalchemy import desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.agent.models.models import (
+from app.agent.models.chat_models import (
     ChatMessage,
     Content,
     Conversation,

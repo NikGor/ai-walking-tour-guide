@@ -1,4 +1,4 @@
-from .models import (
+from .chat_models import (
     ChatHistoryMessage,
     ChatHistoryResponse,
     ChatMessage,

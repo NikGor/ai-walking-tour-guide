@@ -41,3 +41,6 @@ data/
 
 # Samples
 samples/
+
+# Dev sandbox
+sandbox.py

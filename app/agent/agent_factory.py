@@ -1,12 +1,12 @@
 import logging
 from typing import Any, cast
 
-from app.agent.models.models import ChatRequest, ChatResponse
+from app.agent.function_runner import run_agentic_loop
+from app.agent.models.chat_models import ChatRequest, ChatResponse
 from app.agent.prompt_builder import PromptBuilder
 from app.backend.openrouter_client import OpenRouterClient
 from app.utils.geocoder_utils import LocationContext, get_location_context
 from app.utils.llm_parser_utils import ParsedLLMResponse
-from app.utils.loop_utils import run_agentic_loop
 from app.utils.registry_utils import get_tools
 
 logger = logging.getLogger(__name__)

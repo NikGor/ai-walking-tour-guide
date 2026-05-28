@@ -10,7 +10,7 @@ import json
 import logging
 from typing import Any
 
-from app.agent.models.models import ChatRequest, ChatResponse
+from app.agent.models.chat_models import ChatRequest, ChatResponse
 from app.backend.openrouter_client import OpenRouterClient
 from app.utils.dispatcher_utils import execute_tool
 from app.utils.llm_parser_utils import ParsedLLMResponse, parse_openrouter_response

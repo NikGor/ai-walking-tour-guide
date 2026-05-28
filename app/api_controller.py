@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.agent_factory import AgentFactory
-from app.agent.models.models import ChatMessage, ChatRequest, ChatResponse, Content
+from app.agent.models.chat_models import ChatMessage, ChatRequest, ChatResponse, Content
 from app.db.repository import get_or_create_conversation, get_recent_messages, save_message
 
 load_dotenv()

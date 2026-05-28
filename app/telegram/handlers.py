@@ -19,7 +19,7 @@ from aiogram.types import (
 )
 from sqlalchemy import func, select
 
-from app.agent.models.models import ChatRequest, Persona
+from app.agent.models.chat_models import ChatRequest, Persona
 from app.api_controller import handle_chat
 from app.db.orm_models import ConversationORM, MessageORM
 from app.db.repository import get_user_settings, upsert_user_settings

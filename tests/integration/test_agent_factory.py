@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.agent.agent_factory import AgentFactory
-from app.agent.models.models import ChatRequest, Persona
+from app.agent.models.chat_models import ChatRequest, Persona
 
 # ── Locations ─────────────────────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ def _stub_tools():
             return "- Chez Fonfon: Famous bouillabaisse restaurant (rating: 4.6)", None
         return "Historical records confirm the site dates to antiquity.", None
 
-    return patch("app.utils.loop_utils.execute_tool", new=AsyncMock(side_effect=_fake))
+    return patch("app.agent.function_runner.execute_tool", new=AsyncMock(side_effect=_fake))
 
 
 def _spy_tools():
@@ -54,7 +54,7 @@ def _spy_tools():
             return "- Chez Fonfon: Famous bouillabaisse restaurant (rating: 4.6)", None
         return "Historical records confirm the site dates to antiquity.", None
 
-    return calls, patch("app.utils.loop_utils.execute_tool", new=AsyncMock(side_effect=_fake))
+    return calls, patch("app.agent.function_runner.execute_tool", new=AsyncMock(side_effect=_fake))
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from app.agent.models.models import ChatResponse
+from app.agent.models.chat_models import ChatResponse
 from app.utils.llm_parser_utils import (
     ParsedLLMResponse,
     calculate_token_cost,

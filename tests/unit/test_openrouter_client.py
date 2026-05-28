@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.agent.models.models import ChatResponse
+from app.agent.models.chat_models import ChatResponse
 from app.backend.openrouter_client import OpenRouterClient
 
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.agent.models.models import Persona
+from app.agent.models.chat_models import Persona
 from app.agent.prompt_builder import PromptBuilder
 
 

@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.agent.models.models import (
+from app.agent.models.chat_models import (
     InputTokensDetails,
     LllmTrace,
     OutputTokensDetails,
