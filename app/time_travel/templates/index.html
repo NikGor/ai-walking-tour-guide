@@ -404,6 +404,11 @@
 
     /* ── Error banner ────────────────────────── */
     .error-banner {
+      position: fixed;
+      bottom: 24px;
+      left: 16px;
+      right: 16px;
+      z-index: 999;
       background: color-mix(in srgb, #e53935 20%, var(--bg));
       border: 1px solid #e53935;
       border-radius: var(--radius-sm);
@@ -411,6 +416,7 @@
       font-size: 14px;
       color: #ef9a9a;
       display: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,.4);
     }
     .error-banner.visible { display: block; }
   </style>
@@ -431,9 +437,6 @@
     <span class="loc-text" id="loc-text">Нажми чтобы определить место</span>
     <span class="loc-change" id="loc-change"></span>
   </div>
-
-  <!-- Error banner -->
-  <div id="error-banner" class="error-banner"></div>
 
   <!-- Sample locations -->
   <div class="section-label">Места для теста</div>
@@ -539,6 +542,9 @@
 
 
 <!-- ── Loading screen ──────────────────────────────────────────────── -->
+<!-- Error banner — outside all screens so it's visible on any screen -->
+<div id="error-banner" class="error-banner"></div>
+
 <div id="screen-loading" class="screen">
   <div class="loader-circle"></div>
   <div class="loading-label" id="loading-label">Строим машину времени…</div>

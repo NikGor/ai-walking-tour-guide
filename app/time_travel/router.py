@@ -94,13 +94,20 @@ def _validate_init_data(init_data: str) -> int | None:
     ).hexdigest()
 
     if not hmac.compare_digest(received_hash, expected_hash):
-        logger.warning("time_travel_route_002: initData hash mismatch")
+        logger.warning(
+            "time_travel_route_002: initData hash mismatch  recv=%.8s  want=%.8s",
+            received_hash,
+            expected_hash,
+        )
         return None
 
     try:
         user = json.loads(unquote(parsed.get("user", "{}")))
-        return user.get("id")
-    except Exception:
+        user_id = user.get("id")
+        logger.info("time_travel_route_002b: initData valid  user_id=%s", user_id)
+        return user_id
+    except Exception as e:
+        logger.warning("time_travel_route_002c: user parse failed: %s", e)
         return None
 
 
@@ -114,6 +121,11 @@ async def send_to_chat(request: SendToChatRequest) -> dict:
     # Authenticate via initData (skip validation in local dev if token matches env)
     chat_id = _validate_init_data(request.init_data)
     if not chat_id:
+        logger.warning(
+            "time_travel_route_send_403: init_data len=%d  bot_token_set=%s",
+            len(request.init_data),
+            bool(bot_token),
+        )
         raise HTTPException(status_code=403, detail="Invalid or missing initData")
 
     logger.info(
