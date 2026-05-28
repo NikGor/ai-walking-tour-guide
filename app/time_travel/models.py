@@ -18,12 +18,6 @@ class TimeTravelRequest(BaseModel):
     language: str = "ru"
 
 
-class LuckyRequest(BaseModel):
-    """Request a random spectacular historical event (location + date)."""
-
-    language: str = "ru"
-
-
 class SendToChatRequest(BaseModel):
     image_data: str  # base64
     image_mime: str = "image/jpeg"
@@ -31,14 +25,6 @@ class SendToChatRequest(BaseModel):
     location_name: str
     historical_text: str
     init_data: str = Field(default="", description="Telegram WebApp initData for auth")
-
-
-class TimeTravelSuggestion(BaseModel):
-    label: str  # Russian label shown as button
-    year: int
-    era: Literal["BCE", "CE"]
-    lat: float
-    lng: float
 
 
 class TimeTravelResponse(BaseModel):

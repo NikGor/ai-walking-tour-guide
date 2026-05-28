@@ -53,12 +53,6 @@ async def get_location_context(lat: float, lon: float) -> LocationContext:
     return ctx
 
 
-async def reverse_geocode(lat: float, lon: float) -> str:
-    """Thin backward-compat wrapper — returns just the place name string."""
-    ctx = await get_location_context(lat, lon)
-    return ctx.name
-
-
 # ── Internal fetchers ──────────────────────────────────────────────────────────
 
 
