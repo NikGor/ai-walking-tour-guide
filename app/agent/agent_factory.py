@@ -1,13 +1,13 @@
 import logging
 from typing import Any, cast
 
-from app.agent.loop import run_agentic_loop
 from app.agent.models.models import ChatRequest, ChatResponse
 from app.agent.prompt_builder import PromptBuilder
 from app.agent.tools.registry import get_tools
 from app.backend.openrouter_client import OpenRouterClient
-from app.utils.geocoder import LocationContext, get_location_context
-from app.utils.llm_parser import ParsedLLMResponse, parse_openrouter_response
+from app.utils.geocoder_utils import LocationContext, get_location_context
+from app.utils.llm_parser_utils import ParsedLLMResponse
+from app.utils.loop_utils import run_agentic_loop
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class AgentFactory:
         )
 
         # ── Agentic loop (tools → structured output) ──────────────────────────
-        raw, map_png = await run_agentic_loop(
+        parsed = await run_agentic_loop(
             client=self._client,
             messages=messages,
             tools=get_tools(has_location),
@@ -50,10 +50,6 @@ class AgentFactory:
             model=_MODEL,
         )
 
-        # ── Parse & log ───────────────────────────────────────────────────────
-        parsed = parse_openrouter_response(raw, ChatResponse)
-        if map_png:
-            parsed.map_image = map_png
         result = cast(ChatResponse, parsed.parsed_content)
 
         logger.info(

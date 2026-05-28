@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from jinja2 import Environment, FileSystemLoader
 
 if TYPE_CHECKING:
-    from app.utils.geocoder import LocationContext
+    from app.utils.geocoder_utils import LocationContext
 
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 

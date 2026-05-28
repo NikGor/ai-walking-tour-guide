@@ -36,25 +36,25 @@ def factory():
 def _stub_tools():
     """Patch execute_tool in the loop with a lightweight stub."""
 
-    async def _fake(name: str, args: dict, lat: float, lon: float) -> str:
+    async def _fake(name: str, args: dict, lat: float, lon: float) -> tuple[str, None]:
         if name == "google_places_search":
-            return "- Chez Fonfon: Famous bouillabaisse restaurant (rating: 4.6)"
-        return "Historical records confirm the site dates to antiquity."
+            return "- Chez Fonfon: Famous bouillabaisse restaurant (rating: 4.6)", None
+        return "Historical records confirm the site dates to antiquity.", None
 
-    return patch("app.agent.loop.execute_tool", new=AsyncMock(side_effect=_fake))
+    return patch("app.utils.loop_utils.execute_tool", new=AsyncMock(side_effect=_fake))
 
 
 def _spy_tools():
     """Like _stub_tools but also records which tools were called."""
     calls: list[str] = []
 
-    async def _fake(name: str, args: dict, lat: float, lon: float) -> str:
+    async def _fake(name: str, args: dict, lat: float, lon: float) -> tuple[str, None]:
         calls.append(name)
         if name == "google_places_search":
-            return "- Chez Fonfon: Famous bouillabaisse restaurant (rating: 4.6)"
-        return "Historical records confirm the site dates to antiquity."
+            return "- Chez Fonfon: Famous bouillabaisse restaurant (rating: 4.6)", None
+        return "Historical records confirm the site dates to antiquity.", None
 
-    return calls, patch("app.agent.loop.execute_tool", new=AsyncMock(side_effect=_fake))
+    return calls, patch("app.utils.loop_utils.execute_tool", new=AsyncMock(side_effect=_fake))
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────

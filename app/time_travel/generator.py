@@ -16,7 +16,7 @@ from typing import Any
 
 from app.time_travel.image_gen import generate_image
 from app.time_travel.models import LuckyResponse, TimeTravelRequest, TimeTravelResponse
-from app.utils.geocoder import LocationContext, get_location_context
+from app.utils.geocoder_utils import LocationContext, get_location_context
 
 logger = logging.getLogger(__name__)
 
