@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import urllib.parse
 from dataclasses import dataclass, field
 
 import aiohttp
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 _NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 _OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-_HEADERS = {"User-Agent": "SolarisPliny/0.1 (walking-tour-guide)"}
+_HEADERS = {"User-Agent": "SolarisPliny/1.0 (github.com/NikGor/ai-walking-tour-guide)"}
 
 
 @dataclass
@@ -46,11 +47,28 @@ async def get_location_context(lat: float, lon: float) -> LocationContext:
 
     ctx = _build_context(lat, lon, nom_result, ovp_result)  # type: ignore[arg-type]
 
-    if ctx.wikipedia:
+    # Wikipedia tag: prefer main object, fall back to first nearby POI with one
+    wiki_tag = ctx.wikipedia or next((p["wikipedia"] for p in ctx.nearby if p.get("wikipedia")), None)
+    # Wikidata ID: prefer main object, fall back to nearby POIs
+    wikidata_id = ctx.wikidata or next(
+        (p["wikidata"] for p in ctx.nearby if p.get("wikidata") and not p.get("wikipedia")), None
+    )
+
+    if wiki_tag:
         try:
-            ctx.wikipedia_summary, ctx.wikipedia_image_url = await _fetch_wikipedia(ctx.wikipedia)
+            ctx.wikipedia_summary, ctx.wikipedia_image_url = await _fetch_wikipedia(wiki_tag)
+            if not ctx.wikipedia:
+                ctx.wikipedia = wiki_tag
         except Exception as e:
             logger.warning("geo_wiki: failed — %s", e)
+    elif wikidata_id:
+        try:
+            wiki_tag_from_wd = await _wikidata_to_wikipedia_tag(wikidata_id)
+            if wiki_tag_from_wd:
+                ctx.wikipedia_summary, ctx.wikipedia_image_url = await _fetch_wikipedia(wiki_tag_from_wd)
+                ctx.wikipedia = wiki_tag_from_wd
+        except Exception as e:
+            logger.warning("geo_wikidata: failed for %s — %s", wikidata_id, e)
 
     return ctx
 
@@ -80,7 +98,7 @@ async def _fetch_nominatim(lat: float, lon: float) -> dict:
 
 async def _fetch_overpass(lat: float, lon: float, radius: int = 150) -> list[dict]:
     query = f"""
-[out:json][timeout:6];
+[out:json][timeout:8];
 (
   node["historic"](around:{radius},{lat},{lon});
   way["historic"](around:{radius},{lat},{lon});
@@ -114,20 +132,40 @@ out tags center 15;
     return pois
 
 
+async def _wikidata_to_wikipedia_tag(qid: str) -> str | None:
+    """Resolve a Wikidata Q-ID to a 'lang:Title' Wikipedia tag (en preferred, then de)."""
+    url = f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json"
+    async with aiohttp.ClientSession(headers=_HEADERS) as session:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+    entity = next(iter(data.get("entities", {}).values()), {})
+    sitelinks = entity.get("sitelinks", {})
+    for lang in ("en", "de", "ru", "fr"):
+        site = sitelinks.get(f"{lang}wiki")
+        if site:
+            return f"{lang}:{site['title']}"
+    return None
+
+
 async def _fetch_wikipedia(tag: str) -> tuple[str | None, str | None]:
     """Fetch intro paragraph and thumbnail URL for a Wikipedia tag like 'ru:Медный всадник'."""
     if ":" not in tag:
         return None, None
     lang, title = tag.split(":", 1)
-    title_encoded = title.replace(" ", "_")
+    title_encoded = urllib.parse.quote(title.replace(" ", "_"), safe="/:_-.()")
     url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title_encoded}"
     async with aiohttp.ClientSession(headers=_HEADERS) as session:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=6)) as resp:
             if resp.status != 200:
+                logger.debug("geo_wiki: %s → HTTP %d", url, resp.status)
                 return None, None
             data = await resp.json()
     extract = data.get("extract")
     image_url = (data.get("originalimage") or data.get("thumbnail") or {}).get("source")
+    if image_url:
+        logger.info("geo_wiki: \033[32m%s\033[0m → image found", tag)
     return extract, image_url
 
 

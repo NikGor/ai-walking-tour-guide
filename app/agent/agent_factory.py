@@ -122,9 +122,10 @@ class AgentFactory:
 
     @staticmethod
     async def _fetch_image(url: str) -> bytes | None:
+        headers = {"User-Agent": "SolarisPliny/1.0 (github.com/NikGor/ai-walking-tour-guide)"}
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(url, timeout=5.0, follow_redirects=True)
+            async with httpx.AsyncClient(headers=headers) as client:
+                resp = await client.get(url, timeout=8.0, follow_redirects=True)
                 resp.raise_for_status()
                 return resp.content
         except Exception as e:
