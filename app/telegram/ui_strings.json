@@ -1,6 +1,6 @@
 {
   "ru": {
-    "help": "🗺 <b>Solaris Pliny</b> — твой личный историк\n\n📍 Отправь геолокацию — получи историю места\n📸 Отправь фото — определю объект и расскажу\n🕰 Нажми <b>Машина времени</b> — посмотри место в другую эпоху\n💬 Задай вопрос — копну глубже\n\n/tour — пешеходный тур по городу\n/settings — стиль, язык, голос\n/new — начать заново",
+    "help": "🗺 <b>Solaris Pliny</b> — твой личный историк\n\n📍 Отправь геолокацию — получи историю места\n📸 Отправь фото — определю объект и расскажу\n🕰 Нажми <b>Машина времени</b> — посмотри место в другую эпоху\n💬 Задай вопрос — копну глубже\n\n/whereami — история текущего места\n/tour — пешеходный тур по городу\n/settings — стиль, язык, голос\n/new — начать заново",
     "no_location": "Сначала отправь геолокацию 📍",
     "choose_style": "Выбери стиль рассказа:",
     "choose_lang": "Выбери язык ответов:",
@@ -53,7 +53,7 @@
     "photo_no_location": "Сначала отправь геолокацию 📍, потом фото."
   },
   "en": {
-    "help": "🗺 <b>Solaris Pliny</b> — your personal historian\n\n📍 Send location — get the story of that spot\n📸 Send a photo — I'll identify the landmark\n🕰 Tap <b>Time Machine</b> — see the place in another era\n💬 Ask a question — I'll dig deeper\n\n/tour — walking city tour\n/settings — style, language, voice\n/new — start over",
+    "help": "🗺 <b>Solaris Pliny</b> — your personal historian\n\n📍 Send location — get the story of that spot\n📸 Send a photo — I'll identify the landmark\n🕰 Tap <b>Time Machine</b> — see the place in another era\n💬 Ask a question — I'll dig deeper\n\n/whereami — story of the current spot\n/tour — walking city tour\n/settings — style, language, voice\n/new — start over",
     "no_location": "Send your location first 📍",
     "choose_style": "Choose a narrative style:",
     "choose_lang": "Choose response language:",
@@ -106,7 +106,7 @@
     "photo_no_location": "Send your location 📍 first, then a photo."
   },
   "de": {
-    "help": "🗺 <b>Solaris Pliny</b> — dein persönlicher Historiker\n\n📍 Standort senden — Geschichte dieses Ortes\n📸 Foto senden — ich erkenne das Gebäude\n🕰 <b>Zeitmaschine</b> tippen — sieh den Ort in einer anderen Epoche\n💬 Frag mich — ich tauche tiefer\n\n/tour — Stadtrundgang\n/settings — Stil, Sprache, Stimme\n/new — neu starten",
+    "help": "🗺 <b>Solaris Pliny</b> — dein persönlicher Historiker\n\n📍 Standort senden — Geschichte dieses Ortes\n📸 Foto senden — ich erkenne das Gebäude\n🕰 <b>Zeitmaschine</b> tippen — sieh den Ort in einer anderen Epoche\n💬 Frag mich — ich tauche tiefer\n\n/whereami — Geschichte dieses Ortes\n/tour — Stadtrundgang\n/settings — Stil, Sprache, Stimme\n/new — neu starten",
     "no_location": "Sende zuerst deinen Standort 📍",
     "choose_style": "Wähle einen Erzählstil:",
     "choose_lang": "Wähle die Antwortsprache:",
