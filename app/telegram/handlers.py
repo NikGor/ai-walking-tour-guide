@@ -434,31 +434,69 @@ async def cmd_history(message: Message) -> None:
     await message.answer("\n".join(lines))
 
 
+def _settings_kb(persona: Persona, lang: str, voice: bool, fmt: str, lang_ui: str) -> InlineKeyboardMarkup:
+    """Inline keyboard for /settings — tap any row to change that setting."""
+    p_label = _persona_labels(lang_ui)[persona]
+    l_label = _lang_labels(lang_ui)[lang]
+    # Short format label — strip emoji/description, keep acronym
+    fmt_short = {"html": "HTML", "markdown": "MD", "plain": "Text"}.get(fmt, fmt.upper())
+    voice_label = "🔊 вкл" if voice else "🔇 выкл"
+    if lang_ui == "en":
+        voice_label = "🔊 on" if voice else "🔇 off"
+    elif lang_ui == "de":
+        voice_label = "🔊 an" if voice else "🔇 aus"
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=p_label, callback_data="open:modes"),
+                InlineKeyboardButton(text=l_label, callback_data="open:lang"),
+            ],
+            [
+                InlineKeyboardButton(text=voice_label, callback_data="open:voice"),
+                InlineKeyboardButton(text=f"📄 {fmt_short}", callback_data="open:fmt"),
+            ],
+            [
+                InlineKeyboardButton(text=_t("settings_btn_reset", lang_ui), callback_data="open:new"),
+            ],
+        ]
+    )
+
+
+def _settings_text(session: dict, lang_ui: str, chat_id: int) -> str:
+    persona = Persona(session.get("persona", Persona.historian))
+    lang = session.get("lang", "auto")
+    fmt = session.get("fmt", RESPONSE_FORMAT)
+    voice = session.get("voice", False)
+    lat = session.get("lat")
+    lon = session.get("lon")
+    loc_str = f"{lat:.4f}, {lon:.4f}" if lat else _t("settings_location_none", lang_ui)
+    return "\n".join(
+        [
+            _t("settings_header", lang_ui),
+            _t("settings_style", lang_ui).format(label=_persona_labels(lang_ui)[persona]),
+            _t("settings_lang", lang_ui).format(label=_lang_labels(lang_ui)[lang]),
+            _t("settings_fmt", lang_ui).format(label=_fmt_labels(lang_ui).get(fmt, fmt)),
+            _t("settings_voice_on" if voice else "settings_voice_off", lang_ui),
+            _t("settings_location", lang_ui).format(loc=loc_str),
+            f"🆔 Chat ID: <code>{chat_id}</code>",
+        ]
+    )
+
+
 @router.message(Command("settings"))
 async def cmd_settings(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
+    lang_ui = _ui(session)
     persona = Persona(session.get("persona", Persona.historian))
     lang = session.get("lang", "auto")
-    lat = session.get("lat")
-    lon = session.get("lon")
-
     fmt = session.get("fmt", RESPONSE_FORMAT)
     voice = session.get("voice", False)
-    lang_ui = _ui(session)
-    loc_str = f"{lat:.4f}, {lon:.4f}" if lat else _t("settings_location_none", lang_ui)
-    lines = [
-        _t("settings_header", lang_ui),
-        _t("settings_style", lang_ui).format(label=_persona_labels(lang_ui)[persona]),
-        _t("settings_lang", lang_ui).format(label=_lang_labels(lang_ui)[lang]),
-        _t("settings_fmt", lang_ui).format(label=_fmt_labels(lang_ui).get(fmt, fmt)),
-        _t("settings_voice_on" if voice else "settings_voice_off", lang_ui),
-        _t("settings_location", lang_ui).format(loc=loc_str),
-        f"🆔 Chat ID: <code>{chat_id}</code>",
-        "",
-        _t("settings_footer", lang_ui),
-    ]
-    await message.answer("\n".join(lines))
+    await message.answer(
+        _settings_text(session, lang_ui, chat_id),
+        parse_mode=ParseMode.HTML,
+        reply_markup=_settings_kb(persona, lang, voice, fmt, lang_ui),
+    )
 
 
 # ── Callbacks ─────────────────────────────────────────────────────────────────
@@ -542,6 +580,54 @@ async def cb_fmt(callback: CallbackQuery) -> None:
         reply_markup=None,
         parse_mode=ParseMode.HTML,
     )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("open:"))
+async def cb_open_setting(callback: CallbackQuery) -> None:
+    """Inline settings buttons — open the relevant chooser or toggle voice/reset."""
+    if not callback.message:
+        await callback.answer()
+        return
+    chat_id = callback.message.chat.id
+    session = await _get_session(chat_id)
+    lang_ui = _ui(session)
+    action = callback.data.split(":", 1)[1]
+
+    if action == "modes":
+        persona = Persona(session.get("persona", Persona.historian))
+        await callback.message.answer(_t("choose_style", lang_ui), reply_markup=_modes_kb(persona, lang_ui))
+    elif action == "lang":
+        lang = session.get("lang", "auto")
+        await callback.message.answer(_t("choose_lang", lang_ui), reply_markup=_lang_kb(lang, lang_ui))
+    elif action == "fmt":
+        fmt = session.get("fmt", RESPONSE_FORMAT)
+        await callback.message.answer(_t("choose_fmt", lang_ui), reply_markup=_fmt_kb(fmt, lang_ui))
+    elif action == "voice":
+        new_state = not session.get("voice", False)
+        session["voice"] = new_state
+        await _persist_session(chat_id)
+        persona = Persona(session.get("persona", Persona.historian))
+        lang = session.get("lang", "auto")
+        fmt = session.get("fmt", RESPONSE_FORMAT)
+        try:
+            await callback.message.edit_text(
+                _settings_text(session, lang_ui, chat_id),
+                parse_mode=ParseMode.HTML,
+                reply_markup=_settings_kb(persona, lang, new_state, fmt, lang_ui),
+            )
+        except Exception:
+            pass
+    elif action == "new":
+        session["lat"] = None
+        session["lon"] = None
+        await _persist_session(chat_id)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await callback.message.answer(_t("new_conv", lang_ui), reply_markup=_location_markup(lang_ui))
+
     await callback.answer()
 
 

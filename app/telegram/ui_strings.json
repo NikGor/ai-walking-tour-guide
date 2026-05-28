@@ -1,6 +1,6 @@
 {
   "ru": {
-    "help": "🗺 <b>Solaris Pliny</b> — твой личный историк\n\n<b>Как пользоваться:</b>\n1. Отправь 📍 геолокацию — получи историю места\n2. Напиши вопрос — уточни детали или спроси о чём-то рядом\n3. Отправь фото — бот определит объект и расскажет его историю\n4. Нажми 🕰 <b>Машина времени</b> — посмотри как выглядело место в любую эпоху\n\n<b>Команды:</b>\n/whereami — история текущего места\n/continue — продолжить рассказ\n/tour — пешеходный тур по городу 🗺\n/modes — стиль рассказа\n/lang — язык ответов\n/fmt — формат текста (HTML / Markdown)\n/voice — включить / выключить голосовые ответы 🔊\n/new — начать новый разговор\n/history — статистика сессии\n/settings — все настройки\n/help — эта справка",
+    "help": "🗺 <b>Solaris Pliny</b> — твой личный историк\n\n📍 Отправь геолокацию — получи историю места\n📸 Отправь фото — определю объект и расскажу\n🕰 Нажми <b>Машина времени</b> — посмотри место в другую эпоху\n💬 Задай вопрос — копну глубже\n\n/tour — пешеходный тур по городу\n/settings — стиль, язык, голос\n/new — начать заново",
     "no_location": "Сначала отправь геолокацию 📍",
     "choose_style": "Выбери стиль рассказа:",
     "choose_lang": "Выбери язык ответов:",
@@ -24,7 +24,7 @@
     "settings_voice_off": "🔇 Голос: <b>выключен</b>",
     "settings_location": "📍 Последняя локация: <code>{loc}</code>",
     "settings_location_none": "не задана",
-    "settings_footer": "/modes — стиль  •  /lang — язык  •  /fmt — формат  •  /voice — голос\n/new — начать новый разговор",
+    "settings_btn_reset": "🔄 Сбросить",
     "tour_help": "🗺 <b>Тур по городу</b>\n\nОтправь локацию 📍 чтобы я определил город автоматически, или укажи город явно:\n\n<code>/tour Рим</code>\n<code>/tour Saint Petersburg</code>",
     "style_selected": "✅ Стиль: <b>{label}</b>\n\nОтправь локацию или /whereami чтобы получить рассказ.\n/continue — продолжить с новой персоной.",
     "lang_selected": "✅ Язык: <b>{label}</b>",
@@ -53,7 +53,7 @@
     "photo_no_location": "Сначала отправь геолокацию 📍, потом фото."
   },
   "en": {
-    "help": "🗺 <b>Solaris Pliny</b> — your personal historian\n\n<b>How to use:</b>\n1. Send 📍 your location — get the history of that spot\n2. Ask a question — dig deeper or ask about something nearby\n3. Send a photo — the bot identifies the landmark and tells its story\n4. Tap 🕰 <b>Time Machine</b> — see how the place looked in any era\n\n<b>Commands:</b>\n/whereami — story of the current location\n/continue — continue the narrative\n/tour — walking city tour 🗺\n/modes — narrative style\n/lang — response language\n/fmt — text format (HTML / Markdown)\n/voice — toggle voice replies 🔊\n/new — start a new conversation\n/history — session stats\n/settings — all settings\n/help — this reference",
+    "help": "🗺 <b>Solaris Pliny</b> — your personal historian\n\n📍 Send location — get the story of that spot\n📸 Send a photo — I'll identify the landmark\n🕰 Tap <b>Time Machine</b> — see the place in another era\n💬 Ask a question — I'll dig deeper\n\n/tour — walking city tour\n/settings — style, language, voice\n/new — start over",
     "no_location": "Send your location first 📍",
     "choose_style": "Choose a narrative style:",
     "choose_lang": "Choose response language:",
@@ -77,7 +77,7 @@
     "settings_voice_off": "🔇 Voice: <b>off</b>",
     "settings_location": "📍 Last location: <code>{loc}</code>",
     "settings_location_none": "not set",
-    "settings_footer": "/modes — style  •  /lang — language  •  /fmt — format  •  /voice — voice\n/new — new conversation",
+    "settings_btn_reset": "🔄 Reset",
     "tour_help": "🗺 <b>City tour</b>\n\nSend your location 📍 for automatic city detection, or specify a city:\n\n<code>/tour Rome</code>\n<code>/tour Saint Petersburg</code>",
     "style_selected": "✅ Style: <b>{label}</b>\n\nSend a location or use /whereami to get a story.\n/continue — continue with the new persona.",
     "lang_selected": "✅ Language: <b>{label}</b>",
@@ -106,7 +106,7 @@
     "photo_no_location": "Send your location 📍 first, then a photo."
   },
   "de": {
-    "help": "🗺 <b>Solaris Pliny</b> — dein persönlicher Historiker\n\n<b>Verwendung:</b>\n1. Sende 📍 deinen Standort — erhalte die Geschichte dieses Ortes\n2. Stelle eine Frage — tauche tiefer ein oder frage nach etwas in der Nähe\n3. Sende ein Foto — der Bot erkennt das Gebäude und erzählt seine Geschichte\n4. Tippe auf 🕰 <b>Zeitmaschine</b> — sieh, wie der Ort in einer anderen Epoche aussah\n\n<b>Befehle:</b>\n/whereami — Geschichte des aktuellen Ortes\n/continue — Erzählung fortsetzen\n/tour — Stadtrundgang 🗺\n/modes — Erzählstil\n/lang — Antwortsprache\n/fmt — Textformat (HTML / Markdown)\n/voice — Sprachantworten ein/aus 🔊\n/new — Neues Gespräch starten\n/history — Sitzungsstatistik\n/settings — Alle Einstellungen\n/help — Diese Hilfe",
+    "help": "🗺 <b>Solaris Pliny</b> — dein persönlicher Historiker\n\n📍 Standort senden — Geschichte dieses Ortes\n📸 Foto senden — ich erkenne das Gebäude\n🕰 <b>Zeitmaschine</b> tippen — sieh den Ort in einer anderen Epoche\n💬 Frag mich — ich tauche tiefer\n\n/tour — Stadtrundgang\n/settings — Stil, Sprache, Stimme\n/new — neu starten",
     "no_location": "Sende zuerst deinen Standort 📍",
     "choose_style": "Wähle einen Erzählstil:",
     "choose_lang": "Wähle die Antwortsprache:",
@@ -130,7 +130,7 @@
     "settings_voice_off": "🔇 Stimme: <b>inaktiv</b>",
     "settings_location": "📍 Letzter Standort: <code>{loc}</code>",
     "settings_location_none": "nicht gesetzt",
-    "settings_footer": "/modes — Stil  •  /lang — Sprache  •  /fmt — Format  •  /voice — Stimme\n/new — Neues Gespräch",
+    "settings_btn_reset": "🔄 Zurücksetzen",
     "tour_help": "🗺 <b>Stadtrundgang</b>\n\nSende deinen Standort 📍 zur automatischen Stadterkennung oder gib eine Stadt an:\n\n<code>/tour Rom</code>\n<code>/tour Sankt Petersburg</code>",
     "style_selected": "✅ Stil: <b>{label}</b>\n\nSende einen Standort oder nutze /whereami für eine Geschichte.\n/continue — mit neuer Persona fortfahren.",
     "lang_selected": "✅ Sprache: <b>{label}</b>",
