@@ -393,9 +393,7 @@ async def cmd_voice(message: Message) -> None:
     await _persist_session(chat_id)
     if new_state:
         await message.answer(
-            "🔊 <b>Голосовой режим включён</b>\n\n"
-            "Ответы будут отправляться как голосовые сообщения.\n\n"
-            "/voice — выключить"
+            "🔊 <b>Голосовой режим включён</b>\n\nОтветы будут приходить как аудио.\n\n/voice — выключить"
         )
     else:
         await message.answer("🔇 <b>Голосовой режим выключен</b>\n\nОтветы снова текстовые.")
