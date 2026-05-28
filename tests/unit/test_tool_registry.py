@@ -1,6 +1,6 @@
 """Unit tests for tool registry — schema correctness and location filtering."""
 
-from app.agent.tools.registry import _TOOLS, get_tools
+from app.utils.registry_utils import _TOOLS, get_tools
 
 
 def test_get_tools_with_location_returns_all():

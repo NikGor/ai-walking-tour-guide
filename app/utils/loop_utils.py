@@ -11,8 +11,9 @@ import logging
 from typing import Any
 
 from app.agent.models.models import ChatRequest, ChatResponse
-from app.agent.tools.dispatcher import execute_tool
 from app.backend.openrouter_client import OpenRouterClient
+from app.utils.dispatcher_utils import execute_tool
+from app.utils.llm_parser_utils import ParsedLLMResponse, parse_openrouter_response
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +24,8 @@ async def run_agentic_loop(
     tools: list[dict],
     request: ChatRequest,
     model: str,
-) -> tuple[Any, bytes | None]:
-    """Run the agentic loop.
-
-    Returns:
-        (raw_llm_response, map_png) — map_png is non-None when a tool produced a map image.
-    """
+) -> ParsedLLMResponse:
+    """Run the agentic loop and return a fully parsed response with map if produced."""
     map_png: bytes | None = None
 
     # ── Round 1: with tools ───────────────────────────────────────────────────
@@ -73,4 +70,6 @@ async def run_agentic_loop(
         messages.append({"role": "user", "content": "Now format your answer as JSON."})
         raw = await client.create_completion(messages=messages, model=model, response_format=ChatResponse)
 
-    return raw, map_png
+    parsed = parse_openrouter_response(raw, ChatResponse)
+    parsed.map_image = map_png
+    return parsed

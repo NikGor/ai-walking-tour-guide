@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.agent.tools.dispatcher import execute_tool
+from app.utils.dispatcher_utils import execute_tool
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def places_result_ok():
 
 async def test_execute_tool_routes_to_google_search(search_result_ok):
     with patch(
-        "app.agent.tools.dispatcher.google_search_tool",
+        "app.utils.dispatcher_utils.google_search_tool",
         new=AsyncMock(return_value=search_result_ok),
     ) as mock_search:
         result, extra = await execute_tool("google_search", {"query": "Römerberg history"}, lat=0, lon=0)
@@ -37,7 +37,7 @@ async def test_execute_tool_routes_to_google_search(search_result_ok):
 
 async def test_execute_tool_routes_to_google_places(places_result_ok):
     with patch(
-        "app.agent.tools.dispatcher.google_places_search_tool",
+        "app.utils.dispatcher_utils.google_places_search_tool",
         new=AsyncMock(return_value=places_result_ok),
     ) as mock_places:
         result, extra = await execute_tool(
@@ -59,7 +59,7 @@ async def test_execute_tool_routes_to_google_places(places_result_ok):
 
 async def test_execute_tool_uses_default_radius_when_not_provided(places_result_ok):
     with patch(
-        "app.agent.tools.dispatcher.google_places_search_tool",
+        "app.utils.dispatcher_utils.google_places_search_tool",
         new=AsyncMock(return_value=places_result_ok),
     ) as mock_places:
         await execute_tool("google_places_search", {"query": "cafe"}, lat=0.0, lon=0.0)
@@ -69,7 +69,7 @@ async def test_execute_tool_uses_default_radius_when_not_provided(places_result_
 
 async def test_execute_tool_returns_error_string_on_search_failure():
     with patch(
-        "app.agent.tools.dispatcher.google_search_tool",
+        "app.utils.dispatcher_utils.google_search_tool",
         new=AsyncMock(return_value={"success": False, "message": "API quota exceeded"}),
     ):
         result, _ = await execute_tool("google_search", {"query": "test"}, lat=0, lon=0)
@@ -80,7 +80,7 @@ async def test_execute_tool_returns_error_string_on_search_failure():
 
 async def test_execute_tool_returns_no_places_found_on_empty_result():
     with patch(
-        "app.agent.tools.dispatcher.google_places_search_tool",
+        "app.utils.dispatcher_utils.google_places_search_tool",
         new=AsyncMock(return_value={"success": True, "places": []}),
     ):
         result, _ = await execute_tool("google_places_search", {"query": "museum"}, lat=0, lon=0)
