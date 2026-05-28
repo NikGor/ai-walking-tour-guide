@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -50,9 +49,6 @@ class PromptBuilder:
     ) -> str:
         _lang_names = {"ru": "Russian", "en": "English", "de": "German"}
         lines: list[str] = []
-
-        today = date.today()
-        lines.append(f"Date: {today.strftime('%B %d, %Y')}")
 
         if latitude is not None and longitude is not None:
             lines.append(f"Coordinates: {latitude}, {longitude}")
