@@ -125,6 +125,11 @@ class ChatMessage(BaseModel):
         exclude=True,  # bytes can't be JSON-serialised; only used internally by Telegram handler
         description="Optional map PNG from a tour tool",
     )
+    wiki_image: bytes | None = Field(
+        default=None,
+        exclude=True,
+        description="Wikipedia thumbnail for the main landmark at this location",
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="Timestamp when the message was created",

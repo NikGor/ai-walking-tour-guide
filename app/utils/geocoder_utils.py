@@ -24,6 +24,7 @@ class LocationContext:
     description: str | None = None  # OSM description tag
     nearby: list[dict] = field(default_factory=list)  # [{name, type, wikipedia, …}]
     wikipedia_summary: str | None = None  # first paragraph from Wikipedia REST API
+    wikipedia_image_url: str | None = None  # thumbnail from Wikipedia REST API
 
 
 async def get_location_context(lat: float, lon: float) -> LocationContext:
@@ -47,7 +48,7 @@ async def get_location_context(lat: float, lon: float) -> LocationContext:
 
     if ctx.wikipedia:
         try:
-            ctx.wikipedia_summary = await _fetch_wikipedia(ctx.wikipedia)
+            ctx.wikipedia_summary, ctx.wikipedia_image_url = await _fetch_wikipedia(ctx.wikipedia)
         except Exception as e:
             logger.warning("geo_wiki: failed — %s", e)
 
@@ -113,22 +114,21 @@ out tags center 15;
     return pois
 
 
-async def _fetch_wikipedia(tag: str) -> str | None:
-    """
-    Fetch the intro paragraph for a Wikipedia tag like 'ru:Медный всадник'.
-    Uses the Wikipedia REST summary endpoint — returns a short extract, not the full article.
-    """
+async def _fetch_wikipedia(tag: str) -> tuple[str | None, str | None]:
+    """Fetch intro paragraph and thumbnail URL for a Wikipedia tag like 'ru:Медный всадник'."""
     if ":" not in tag:
-        return None
+        return None, None
     lang, title = tag.split(":", 1)
     title_encoded = title.replace(" ", "_")
     url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title_encoded}"
     async with aiohttp.ClientSession(headers=_HEADERS) as session:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
             if resp.status != 200:
-                return None
+                return None, None
             data = await resp.json()
-    return data.get("extract")
+    extract = data.get("extract")
+    image_url = (data.get("originalimage") or data.get("thumbnail") or {}).get("source")
+    return extract, image_url
 
 
 # ── Context builder ────────────────────────────────────────────────────────────
