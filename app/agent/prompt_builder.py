@@ -66,6 +66,8 @@ class PromptBuilder:
                 lines.append(f"Architect: {location_ctx.architect}")
             if location_ctx.start_date:
                 lines.append(f"Built: {location_ctx.start_date}")
+            if location_ctx.description:
+                lines.append(f"Description: {location_ctx.description}")
             if location_ctx.wikipedia:
                 lines.append(f"Wikipedia tag: {location_ctx.wikipedia}")
 
@@ -89,6 +91,8 @@ class PromptBuilder:
                     if poi.get("wikipedia"):
                         poi_parts.append(f"— {poi['wikipedia']}")
                     lines.append(" ".join(poi_parts))
+                    if poi.get("description"):
+                        lines.append(f"  {poi['description']}")
 
             # Wikipedia summary — grounding context for the LLM
             if location_ctx.wikipedia_summary:

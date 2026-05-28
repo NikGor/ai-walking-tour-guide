@@ -21,6 +21,7 @@ class LocationContext:
     architect: str | None = None
     start_date: str | None = None
     historic: str | None = None  # monument / castle / memorial / church …
+    description: str | None = None  # OSM description tag
     nearby: list[dict] = field(default_factory=list)  # [{name, type, wikipedia, …}]
     wikipedia_summary: str | None = None  # first paragraph from Wikipedia REST API
 
@@ -171,5 +172,6 @@ def _build_context(lat: float, lon: float, nom: dict, nearby: list[dict]) -> Loc
         architect=extratags.get("architect"),
         start_date=extratags.get("start_date"),
         historic=extratags.get("historic"),
+        description=extratags.get("description"),
         nearby=nearby,
     )
