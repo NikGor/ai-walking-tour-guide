@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Any, cast
 
 from app.agent.function_runner import run_agentic_loop
@@ -26,14 +27,18 @@ class AgentFactory:
     ) -> ParsedLLMResponse:
         has_location = request.latitude is not None and request.longitude is not None
 
+        t0 = time.perf_counter()
+
         # ── Geocode + enrich ──────────────────────────────────────────────────
         location_ctx: LocationContext | None = None
         if has_location:
             assert request.latitude is not None and request.longitude is not None
             location_ctx = await get_location_context(request.latitude, request.longitude)
+        t_geo = time.perf_counter()
 
         # ── Build messages ────────────────────────────────────────────────────
         messages = self._build_messages(request, history, location_ctx)
+        t_prompt = time.perf_counter()
 
         logger.info(
             "\033[35mLLM  ›\033[0m persona=\033[35m%s\033[0m  model=\033[36m%s\033[0m",
@@ -49,11 +54,18 @@ class AgentFactory:
             request=request,
             model=_MODEL,
         )
+        t_llm = time.perf_counter()
 
         result = cast(ChatResponse, parsed.parsed_content)
 
         logger.info(
-            "\033[35mLLM  ›\033[0m done  words=\033[33m%d\033[0m  tokens=\033[33m%d\033[0m  \033[2m$%.4f\033[0m",  # noqa: E501
+            "\033[35mTIME ›\033[0m total=\033[33m%.1fs\033[0m  "
+            "geo=\033[33m%.1fs\033[0m  prompt=\033[33m%.0fms\033[0m  llm=\033[33m%.1fs\033[0m  "
+            "words=\033[33m%d\033[0m  tokens=\033[33m%d\033[0m  \033[2m$%.4f\033[0m",
+            t_llm - t0,
+            t_geo - t0,
+            (t_prompt - t_geo) * 1000,
+            t_llm - t_prompt,
             len(result.text.split()),
             parsed.llm_trace.total_tokens,
             parsed.llm_trace.total_cost,

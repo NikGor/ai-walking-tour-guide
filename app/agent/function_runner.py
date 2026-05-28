@@ -18,6 +18,17 @@ from app.utils.llm_parser_utils import ParsedLLMResponse, parse_openrouter_respo
 logger = logging.getLogger(__name__)
 
 
+def _log_round(raw: Any, round_num: int) -> None:
+    usage = getattr(raw, "usage", None)
+    if usage:
+        logger.info(
+            "\033[35mLLM  ›\033[0m round %d  in=\033[33m%d\033[0m  out=\033[33m%d\033[0m",
+            round_num,
+            getattr(usage, "prompt_tokens", 0) or 0,
+            getattr(usage, "completion_tokens", 0) or 0,
+        )
+
+
 async def run_agentic_loop(
     client: OpenRouterClient,
     messages: list[dict[str, Any]],
@@ -28,8 +39,13 @@ async def run_agentic_loop(
     """Run the agentic loop and return a fully parsed response with map if produced."""
     map_png: bytes | None = None
 
-    # ── Round 1: with tools ───────────────────────────────────────────────────
-    raw = await client.create_completion(messages=messages, model=model, tools=tools)
+    # ── Round 1: tools + structured output in one shot ───────────────────────
+    # response_format is ignored by the model when it calls a tool (content=None);
+    # when it answers directly the response is already valid JSON — no round 2 needed.
+    raw = await client.create_completion(
+        messages=messages, model=model, tools=tools, response_format=ChatResponse
+    )
+    _log_round(raw, 1)
     choice = raw.choices[0]
     tool_calls = getattr(choice.message, "tool_calls", None)
 
@@ -56,19 +72,13 @@ async def run_agentic_loop(
             logger.info("\033[32mTOOL ›\033[0m \033[1m%s\033[0m  args=%s", tc.function.name, args)
             result_str, tool_map_png = await execute_tool(tc.function.name, args, lat, lon)
             if tool_map_png:
-                map_png = tool_map_png  # last map wins (normally only one tour tool per request)
+                map_png = tool_map_png
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result_str})
 
-        # ── Round 2: structured output after tool results ─────────────────────
-        logger.info("\033[35mLLM  ›\033[0m round 2 — structured output")
+        # ── Round 2: only needed after tool execution ─────────────────────────
+        logger.info("\033[35mLLM  ›\033[0m round 2 — structured output after tools")
         raw = await client.create_completion(messages=messages, model=model, response_format=ChatResponse)
-
-    else:
-        # No tools called — re-ask with structured output constraint
-        logger.info("\033[35mLLM  ›\033[0m no tools called, requesting structured output")
-        messages.append({"role": "assistant", "content": choice.message.content})
-        messages.append({"role": "user", "content": "Now format your answer as JSON."})
-        raw = await client.create_completion(messages=messages, model=model, response_format=ChatResponse)
+        _log_round(raw, 2)
 
     parsed = parse_openrouter_response(raw, ChatResponse)
     parsed.map_image = map_png
