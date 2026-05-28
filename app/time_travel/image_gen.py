@@ -14,18 +14,26 @@ logger = logging.getLogger(__name__)
 
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Model tiers mapped to OpenRouter model IDs (Gemini image family)
+# Model tiers mapped to OpenRouter model IDs
 _IMAGE_MODELS: dict[str, str] = {
     "fast": "google/gemini-2.5-flash-image",
-    "balanced": "google/gemini-3.1-flash-image-preview",
+    "balanced": "x-ai/grok-imagine-image-quality",  # best quality+speed, good img2img
     "quality": "google/gemini-3-pro-image-preview",
+}
+
+# Some models output image only; others output image + text
+_MODEL_MODALITIES: dict[str, list[str]] = {
+    "google/gemini-2.5-flash-image": ["image", "text"],
+    "google/gemini-3.1-flash-image-preview": ["image", "text"],
+    "google/gemini-3-pro-image-preview": ["image", "text"],
+    "x-ai/grok-imagine-image-quality": ["image"],
 }
 
 # Fallback order when the primary model fails
 _FALLBACK_CHAIN: list[str] = [
-    "google/gemini-2.5-flash-image",
-    "google/gemini-3.1-flash-image-preview",
+    "x-ai/grok-imagine-image-quality",
     "google/gemini-3-pro-image-preview",
+    "google/gemini-2.5-flash-image",
 ]
 
 
@@ -72,9 +80,10 @@ def _build_messages(prompt: str, reference_image_b64: str | None) -> list[dict]:
 def _extract_image(response_json: dict) -> tuple[str | None, str]:
     """Pull the first image out of an OpenRouter chat-completions response.
 
-    Response content is an array of typed parts:
-      {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
-    or occasionally a plain string when only text was returned.
+    OpenRouter places generated images in message.images[], not in content parts:
+      choices[0].message.images[0].image_url.url → "data:<mime>;base64,<data>"
+
+    Falls back to scanning content parts for older/alternate model responses.
     """
     try:
         choices = response_json.get("choices", [])
@@ -82,31 +91,30 @@ def _extract_image(response_json: dict) -> tuple[str | None, str]:
             logger.warning("time_travel_img_008: no choices in response")
             return None, ""
 
-        content = choices[0].get("message", {}).get("content")
-        if not content:
-            logger.warning("time_travel_img_008b: empty message content")
-            return None, ""
+        msg = choices[0].get("message", {})
 
-        # content can be a list of parts or a plain string
-        parts = content if isinstance(content, list) else [{"type": "text", "text": content}]
+        # Primary path: message.images[]
+        for img in msg.get("images") or []:
+            url = (img.get("image_url") or {}).get("url", "")
+            m = re.match(r"data:([^;]+);base64,(.+)", url, re.DOTALL)
+            if m:
+                mime, img_b64 = m.group(1), m.group(2).strip()
+                logger.info("time_travel_img_009: extracted image  mime=%s  b64_len=%d", mime, len(img_b64))
+                return img_b64, mime
 
-        for part in parts:
-            if not isinstance(part, dict):
+        # Fallback: content as list of typed parts
+        content = msg.get("content")
+        for part in content if isinstance(content, list) else []:
+            if not isinstance(part, dict) or part.get("type") != "image_url":
                 continue
-            if part.get("type") == "image_url":
-                url = part.get("image_url", {}).get("url", "")
-                # url is "data:<mime>;base64,<data>"
-                m = re.match(r"data:([^;]+);base64,(.+)", url, re.DOTALL)
-                if m:
-                    mime, img_b64 = m.group(1), m.group(2).strip()
-                    logger.info(
-                        "time_travel_img_009: extracted image  mime=%s  b64_len=%d",
-                        mime,
-                        len(img_b64),
-                    )
-                    return img_b64, mime
+            url = (part.get("image_url") or {}).get("url", "")
+            m = re.match(r"data:([^;]+);base64,(.+)", url, re.DOTALL)
+            if m:
+                mime, img_b64 = m.group(1), m.group(2).strip()
+                logger.info("time_travel_img_009: extracted image  mime=%s  b64_len=%d", mime, len(img_b64))
+                return img_b64, mime
 
-        logger.warning("time_travel_img_010: no image_url part found in response")
+        logger.warning("time_travel_img_010: no image found in response")
         return None, ""
 
     except Exception as e:
@@ -123,7 +131,7 @@ async def _call_openrouter(
     """Single OpenRouter chat-completions call. Returns parsed JSON or raises."""
     payload = {
         "model": model,
-        "modalities": ["image", "text"],
+        "modalities": _MODEL_MODALITIES.get(model, ["image", "text"]),
         "messages": messages,
     }
     headers = {
