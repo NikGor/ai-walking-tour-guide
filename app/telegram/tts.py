@@ -15,7 +15,17 @@ logger = logging.getLogger(__name__)
 _OPENROUTER_TTS_URL = "https://openrouter.ai/api/v1/audio/speech"
 
 _TTS_MODEL = "openai/gpt-4o-mini-tts-2025-12-15"
-_TTS_VOICE = "alloy"  # neutral/academic; good for Russian long-form narrative
+_TTS_VOICE_DEFAULT = "alloy"
+
+_PERSONA_VOICE: dict[str, str] = {
+    "historian": "sage",  # thoughtful, mature
+    "architecture_expert": "alloy",  # crisp, neutral
+    "roman_empire": "onyx",  # deep, authoritative
+    "storyteller": "fable",  # warm, narrative
+    "medieval_resident": "fable",  # soft, folksy
+    "military_expert": "onyx",  # commanding, firm
+    "deep_time": "sage",  # slow, contemplative
+}
 
 # ~1500 chars ≈ 70–80 s of audio — comfortable Telegram voice message length.
 _MAX_CHARS = 1500
@@ -76,9 +86,10 @@ async def synthesise(text: str, persona: str = "historian") -> bytes | None:
     if len(clean) > _MAX_CHARS:
         clean = clean[:_MAX_CHARS].rsplit(" ", 1)[0] + "…"
 
+    voice = _PERSONA_VOICE.get(persona, _TTS_VOICE_DEFAULT)
     payload = {
         "model": _TTS_MODEL,
-        "voice": _TTS_VOICE,
+        "voice": voice,
         "input": clean,
         "response_format": "mp3",
         "instructions": _PERSONA_INSTRUCTIONS.get(persona, _PERSONA_INSTRUCTIONS["historian"]),
@@ -89,7 +100,7 @@ async def synthesise(text: str, persona: str = "historian") -> bytes | None:
     }
 
     try:
-        logger.info("tts_002: synthesising %d chars  model=%s  voice=%s", len(clean), _TTS_MODEL, _TTS_VOICE)
+        logger.info("tts_002: synthesising %d chars  model=%s  voice=%s", len(clean), _TTS_MODEL, voice)
         async with httpx.AsyncClient() as client:
             resp = await client.post(_OPENROUTER_TTS_URL, json=payload, headers=headers, timeout=30.0)
             if not resp.is_success:
