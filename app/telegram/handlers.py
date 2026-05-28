@@ -731,6 +731,8 @@ async def _dispatch(
         map_file = BufferedInputFile(map_image, filename="tour_map.png")
         await message.answer_photo(photo=map_file)
 
+    await message.answer(reply, parse_mode=_parse_mode(fmt), reply_markup=markup)
+
     # ── Voice mode ────────────────────────────────────────────────────────────
     if session.get("voice") and reply and not reply.startswith("⚠️"):
         from app.telegram.tts import synthesise
@@ -738,9 +740,6 @@ async def _dispatch(
         audio = await synthesise(reply)
         if audio:
             voice_file = BufferedInputFile(audio, filename="voice.mp3")
-            await message.answer_voice(voice=voice_file, reply_markup=markup)
-            return
-        # TTS failed → fall back to text silently
-        logger.warning("tts_fallback: synthesis failed for chat %d, sending text", chat_id)
-
-    await message.answer(reply, parse_mode=_parse_mode(fmt), reply_markup=markup)
+            await message.answer_voice(voice=voice_file)
+        else:
+            logger.warning("tts_fallback: synthesis failed for chat %d", chat_id)
