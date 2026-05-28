@@ -41,9 +41,37 @@ A **Telegram Mini App** that generates an AI image of any location in any histor
 - Select art style: 📷 Реалистично · 🤳 Селфи · 🎨 Арт эпохи
 - **"Моя улица" mode**: upload your own street photo — the bot redraws it in the target era (img2img), preserving the composition
 
-Pipeline: GPT-4.1 generates the historical scene description + image prompt → Gemini 2.0 Flash Preview Image Generation renders the image (Imagen 3 fallback).
+Pipeline: GPT-4.1 generates the historical scene description + image prompt → Gemini image models via OpenRouter render the image.
 
 Opened via the `🕰 Машина времени` button in the persistent keyboard (requires `APP_BASE_URL` env var — see below).
+
+### 🗺 City walking tour
+Ask for a full-day walking itinerary — by name or from your current GPS location:
+
+```
+/tour Rome
+/tour                  ← uses current location to detect the city
+```
+
+The LLM picks 8–12 diverse, walkable attractions from its knowledge. The pipeline then:
+1. Geocodes each POI via Nominatim
+2. Optimises the route with TSP (nearest-neighbour + 2-opt)
+3. Fetches the walking polyline from OSRM
+4. Renders a **static map PNG** sent directly in the chat
+
+The bot narrates the tour in a conversational message with timing, order, and context for each stop.
+
+### 🔊 Voice mode
+Toggle with `/voice` — when enabled, each response is delivered as **both text and audio** simultaneously. The voice matches the active persona:
+
+| Persona | Voice | Character |
+|---|---|---|
+| 📜 Историк, 🧊 Геолог | sage | Thoughtful, measured |
+| ⚔️ Римская империя, 🗡 Военный | onyx | Deep, authoritative |
+| 🎭 Сказитель, 🏚 Средневековый | fable | Warm, expressive |
+| 🏛 Архитектор | alloy | Crisp, precise |
+
+Each voice also receives persona-specific speech instructions — the storyteller is theatrical and varies pace; the military expert is clipped and direct; the geologist speaks slowly with awe. Powered by `gpt-4o-mini-tts` via OpenRouter.
 
 ### 💬 Conversation awareness
 - The bot never repeats facts it already told you in this session
@@ -66,6 +94,8 @@ Opened via the `🕰 Машина времени` button in the persistent keybo
 | `/fmt` | Text format (HTML / Markdown / plain) |
 | `/new` | Reset conversation, keep settings |
 | `/history` | Token usage + cost for this session |
+| `/tour [city]` | Full-day walking tour with optimised route + map |
+| `/voice` | Toggle voice mode (text + audio simultaneously) |
 | `/settings` | Show all current settings |
 | `/help` | This reference |
 
@@ -79,7 +109,8 @@ POST /chat
   ├── build prompt (system.j2 + persona .j2 + conversation history)
   ├── agentic loop — GPT-4.1 via OpenRouter
   │     ├── tool: google_search          — fill specific factual gaps
-  │     └── tool: google_places_search   — venue queries (NEVER invented)
+  │     ├── tool: google_places_search   — venue queries (NEVER invented)
+  │     └── tool: plan_city_tour         — TSP route + OSRM polyline + map PNG
   ├── parse structured response (text + suggestions + recommended_personas)
   └── save to DB (conversation · messages · suggestion history)
 
@@ -87,12 +118,12 @@ GET  /time-travel              → Telegram Mini App HTML
 POST /time-travel/generate
   ├── geocode
   ├── GPT-4.1 → historical narrative + image prompt
-  └── Gemini 2.0 Flash / Imagen 3 → image (base64)
+  └── Gemini image models via OpenRouter → image (base64)
 
 GET  /conversations/{id}       → conversation history (JSON)
 ```
 
-**Stack:** FastAPI · SQLAlchemy async · Alembic · SQLite (local) / PostgreSQL (Railway) · aiogram v3 · OpenRouter → GPT-4.1 · Google Gemini 2.0 Flash / Imagen 3 · google-genai · OpenStreetMap Nominatim + Overpass · Wikipedia REST API
+**Stack:** FastAPI · SQLAlchemy async · Alembic · SQLite (local) / PostgreSQL (Railway) · aiogram v3 · OpenRouter → GPT-4.1 + Gemini image models + gpt-4o-mini-tts · OpenStreetMap Nominatim + Overpass + OSRM · Wikipedia REST API · Google Places API
 
 ---
 
@@ -128,9 +159,9 @@ docker-compose up --build
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENROUTER_API_KEY` | ✅ | LLM access (GPT-4.1 via OpenRouter) |
+| `OPENROUTER_API_KEY` | ✅ | LLM (GPT-4.1), image generation (Time Travel), TTS (voice mode) |
 | `GOOGLE_API_KEY` | ✅ | Google Places API (venue search) |
-| `GEMINI_API_KEY` | ✅ | Gemini image generation (Time Travel Lens) |
+| `GEMINI_API_KEY` | ✅ | Google Search API (factual lookups) |
 | `TELEGRAM_BOT_TOKEN` | for bot | Telegram bot token |
 | `APP_BASE_URL` | for Mini App | Public HTTPS URL of this server (e.g. Railway URL). Enables the 🕰 Машина времени keyboard button. |
 | `SOLARIS_DB_URL` | optional | Database URL. Default: `sqlite+aiosqlite:///./data/solaris.db` |
