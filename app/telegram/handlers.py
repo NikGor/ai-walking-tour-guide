@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 from aiogram import F, Router
@@ -42,6 +43,18 @@ def _ui(session: dict) -> str:
     """Effective UI language from session (auto → ru)."""
     lang = session.get("lang", "auto")
     return lang if lang in ("ru", "en", "de") else "ru"
+
+
+# Telegram HTML supports only: b, strong, i, em, u, ins, s, strike, del, a, code, pre
+_TG_ALLOWED_TAGS = re.compile(
+    r"</?(?:b|strong|i|em|u|ins|s|strike|del|a|code|pre)(?:\s[^>]*)?>",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_html(text: str) -> str:
+    """Strip HTML tags not supported by Telegram's parse_mode=HTML."""
+    return re.sub(r"<[^>]+>", lambda m: m.group(0) if _TG_ALLOWED_TAGS.match(m.group(0)) else "", text)
 
 
 # ── Debug mode ────────────────────────────────────────────────────────────────
@@ -709,10 +722,11 @@ async def _dispatch(
     # ── Map / generated image — send with text as caption ────────────────────
     if map_image:
         parse_mode = _parse_mode(fmt)
-        if len(reply) <= 1024:
+        caption = _sanitize_html(reply) if parse_mode else reply
+        if len(caption) <= 1024:
             await message.answer_photo(
                 photo=BufferedInputFile(map_image, filename="image.jpg"),
-                caption=reply,
+                caption=caption,
                 parse_mode=parse_mode,
                 reply_markup=markup,
             )
