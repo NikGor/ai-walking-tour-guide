@@ -25,6 +25,25 @@ from app.db.orm_models import ConversationORM, MessageORM
 from app.db.repository import get_user_settings, upsert_user_settings
 from app.db.session import AsyncSessionLocal
 
+# ── i18n ─────────────────────────────────────────────────────────────────────
+
+_UI: dict[str, dict[str, str]] = json.loads(
+    (Path(__file__).parent / "ui_strings.json").read_text(encoding="utf-8")
+)
+
+
+def _t(key: str, lang: str) -> str:
+    """Return UI string for lang (ru/en/de). Falls back to ru."""
+    ui_lang = lang if lang in ("ru", "en", "de") else "ru"
+    return _UI.get(ui_lang, _UI["ru"]).get(key) or _UI["ru"][key]
+
+
+def _ui(session: dict) -> str:
+    """Effective UI language from session (auto → ru)."""
+    lang = session.get("lang", "auto")
+    return lang if lang in ("ru", "en", "de") else "ru"
+
+
 # ── Debug mode ────────────────────────────────────────────────────────────────
 
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() in ("1", "true", "yes")
@@ -251,28 +270,7 @@ def _suggestions_kb(
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-# ── Help text ─────────────────────────────────────────────────────────────────
-
-_HELP = (
-    "🗺 <b>Solaris Pliny</b> — твой личный историк\n\n"
-    "<b>Как пользоваться:</b>\n"
-    "1. Отправь 📍 геолокацию — получи историю места\n"
-    "2. Напиши вопрос — уточни детали или спроси о чём-то рядом\n"
-    "3. Отправь фото — бот определит объект и расскажет его историю\n"
-    "4. Нажми 🕰 <b>Машина времени</b> — посмотри как выглядело место в любую эпоху\n\n"
-    "<b>Команды:</b>\n"
-    "/whereami — история текущего места\n"
-    "/continue — продолжить рассказ\n"
-    "/tour — пешеходный тур по городу 🗺\n"
-    "/modes — стиль рассказа\n"
-    "/lang — язык ответов\n"
-    "/fmt — формат текста (HTML / Markdown)\n"
-    "/voice — включить / выключить голосовые ответы 🔊\n"
-    "/new — начать новый разговор\n"
-    "/history — статистика сессии\n"
-    "/settings — все настройки\n"
-    "/help — эта справка"
-)
+# ── Help text removed — served from ui_strings.json via _t("help", lang) ──────
 
 
 # ── Command handlers ──────────────────────────────────────────────────────────
@@ -280,12 +278,14 @@ _HELP = (
 
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
-    await message.answer(_HELP, reply_markup=_location_markup())
+    session = await _get_session(message.chat.id)
+    await message.answer(_t("help", _ui(session)), reply_markup=_location_markup())
 
 
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
-    await message.answer(_HELP)
+    session = await _get_session(message.chat.id)
+    await message.answer(_t("help", _ui(session)))
 
 
 @router.message(Command("whereami"))
@@ -293,7 +293,7 @@ async def cmd_whereami(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     if session.get("lat") is None:
-        await message.answer("Сначала отправь геолокацию 📍", reply_markup=_location_markup())
+        await message.answer(_t("no_location", _ui(session)), reply_markup=_location_markup())
         return
     await _dispatch(message, lat=session["lat"], lon=session["lon"], user_message=None)
 
@@ -303,7 +303,7 @@ async def cmd_continue(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     if session.get("lat") is None:
-        await message.answer("Сначала отправь геолокацию 📍", reply_markup=_location_markup())
+        await message.answer(_t("no_location", _ui(session)), reply_markup=_location_markup())
         return
     await _dispatch(
         message,
@@ -350,14 +350,7 @@ async def cmd_tour(message: Message) -> None:
         )
         await _dispatch(message, lat=lat, lon=lon, user_message=user_message)
     else:
-        await message.answer(
-            "🗺 <b>Тур по городу</b>\n\n"
-            "Отправь локацию 📍 чтобы я определил город автоматически, "
-            "или укажи город явно:\n\n"
-            "<code>/tour Рим</code>\n"
-            "<code>/tour Saint Petersburg</code>",
-            reply_markup=_location_markup(),
-        )
+        await message.answer(_t("tour_help", _ui(session)), reply_markup=_location_markup())
 
 
 @router.message(Command("modes"))
@@ -365,7 +358,7 @@ async def cmd_modes(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     persona = Persona(session.get("persona", Persona.historian))
-    await message.answer("Выбери стиль рассказа:", reply_markup=_modes_kb(persona))
+    await message.answer(_t("choose_style", _ui(session)), reply_markup=_modes_kb(persona))
 
 
 @router.message(Command("lang"))
@@ -373,7 +366,7 @@ async def cmd_lang(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     lang = session.get("lang", "auto")
-    await message.answer("Выбери язык ответов:", reply_markup=_lang_kb(lang))
+    await message.answer(_t("choose_lang", _ui(session)), reply_markup=_lang_kb(lang))
 
 
 @router.message(Command("fmt"))
@@ -381,7 +374,7 @@ async def cmd_fmt(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     fmt = session.get("fmt", RESPONSE_FORMAT)
-    await message.answer("Выбери формат текста:", reply_markup=_fmt_kb(fmt))
+    await message.answer(_t("choose_fmt", _ui(session)), reply_markup=_fmt_kb(fmt))
 
 
 @router.message(Command("voice"))
@@ -391,12 +384,11 @@ async def cmd_voice(message: Message) -> None:
     new_state = not session.get("voice", False)
     session["voice"] = new_state
     await _persist_session(chat_id)
+    lang = _ui(session)
     if new_state:
-        await message.answer(
-            "🔊 <b>Голосовой режим включён</b>\n\nОтветы будут приходить как аудио.\n\n/voice — выключить"
-        )
+        await message.answer(_t("voice_on", lang))
     else:
-        await message.answer("🔇 <b>Голосовой режим выключен</b>\n\nОтветы снова текстовые.")
+        await message.answer(_t("voice_off", lang))
 
 
 @router.message(Command("new"))
@@ -408,10 +400,7 @@ async def cmd_new(message: Message) -> None:
     session["lon"] = None
     await _persist_session(chat_id)
     logger.info("\033[34mTG   ›\033[0m new conversation  chat=\033[36m%d\033[0m", chat_id)
-    await message.answer(
-        "🔄 <b>Новый разговор</b>\n\nЛокация и история сброшены. Отправь 📍 чтобы начать.",
-        reply_markup=_location_markup(),
-    )
+    await message.answer(_t("new_conv", _ui(session)), reply_markup=_location_markup())
 
 
 @router.message(Command("history"))
@@ -430,19 +419,22 @@ async def cmd_history(message: Message) -> None:
             )
             user_msg_count = count_result.scalar() or 0
 
+    session = await _get_session(chat_id)
+    lang = _ui(session)
+
     if not conv:
-        await message.answer("История пуста. Отправь геолокацию 📍 чтобы начать.")
+        await message.answer(_t("history_empty", lang))
         return
 
     lines = [
-        "🗂 <b>Статистика сессии</b>",
-        f"💬 Вопросов задано: <b>{user_msg_count}</b>",
-        f"🪙 Токенов использовано: {conv.total_tokens:,}",
-        f"💵 Потрачено: <b>${conv.total_cost:.4f}</b>",
-        f"📅 Начат: {conv.created_at.strftime('%d.%m.%Y %H:%M')}",
-        f"🔄 Последнее: {conv.updated_at.strftime('%d.%m.%Y %H:%M')}",
+        _t("history_header", lang),
+        _t("history_questions", lang).format(n=user_msg_count),
+        _t("history_tokens", lang).format(n=f"{conv.total_tokens:,}"),
+        _t("history_cost", lang).format(cost=f"{conv.total_cost:.4f}"),
+        _t("history_started", lang).format(date=conv.created_at.strftime("%d.%m.%Y %H:%M")),
+        _t("history_updated", lang).format(date=conv.updated_at.strftime("%d.%m.%Y %H:%M")),
         "",
-        "/new — начать новый разговор",
+        _t("history_footer", lang),
     ]
     await message.answer("\n".join(lines))
 
@@ -458,18 +450,18 @@ async def cmd_settings(message: Message) -> None:
 
     fmt = session.get("fmt", RESPONSE_FORMAT)
     voice = session.get("voice", False)
-    location_str = f"{lat:.4f}, {lon:.4f}" if lat else "не задана"
+    lang_ui = _ui(session)
+    loc_str = f"{lat:.4f}, {lon:.4f}" if lat else _t("settings_location_none", lang_ui)
     lines = [
-        "⚙️ <b>Настройки</b>",
-        f"🎭 Стиль: <b>{_PERSONA_LABELS[persona]}</b>",
-        f"🌐 Язык: <b>{_LANG_LABELS[lang]}</b>",
-        f"📄 Формат: <b>{_FMT_LABELS.get(fmt, fmt)}</b>",
-        f"{'🔊' if voice else '🔇'} Голос: <b>{'включён' if voice else 'выключен'}</b>",
-        f"📍 Последняя локация: <code>{location_str}</code>",
+        _t("settings_header", lang_ui),
+        _t("settings_style", lang_ui).format(label=_PERSONA_LABELS[persona]),
+        _t("settings_lang", lang_ui).format(label=_LANG_LABELS[lang]),
+        _t("settings_fmt", lang_ui).format(label=_FMT_LABELS.get(fmt, fmt)),
+        _t("settings_voice_on" if voice else "settings_voice_off", lang_ui),
+        _t("settings_location", lang_ui).format(loc=loc_str),
         f"🆔 Chat ID: <code>{chat_id}</code>",
         "",
-        "/modes — стиль  •  /lang — язык  •  /fmt — формат  •  /voice — голос",
-        "/new — начать новый разговор",
+        _t("settings_footer", lang_ui),
     ]
     await message.answer("\n".join(lines))
 
@@ -485,11 +477,10 @@ async def cb_mode(callback: CallbackQuery) -> None:
     session["persona"] = persona.value
     await _persist_session(chat_id)
     label = _PERSONA_LABELS[persona]
+    lang_ui = _ui(session)
     await _safe_edit(
         callback.message,
-        f"✅ Стиль: <b>{label}</b>\n\n"
-        "Отправь локацию или /whereami чтобы получить рассказ.\n"
-        "/continue — продолжить с новой персоной.",
+        _t("style_selected", lang_ui).format(label=label),
         reply_markup=None,
     )
     await callback.answer()
@@ -505,7 +496,7 @@ async def cb_lang(callback: CallbackQuery) -> None:
     label = _LANG_LABELS[lang]
     await _safe_edit(
         callback.message,
-        f"✅ Язык: <b>{label}</b>",
+        _t("lang_selected", _ui(session)).format(label=label),
         reply_markup=None,
     )
     await callback.answer()
@@ -514,7 +505,7 @@ async def cb_lang(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("place:"))
 async def cb_place(callback: CallbackQuery) -> None:
     if not callback.message or not hasattr(callback.message, "answer"):
-        await callback.answer("⚠️ Сообщение недоступно")
+        await callback.answer("⚠️")
         return
 
     place_name = callback.data.split(":", 1)[1]
@@ -548,9 +539,10 @@ async def cb_fmt(callback: CallbackQuery) -> None:
     session["fmt"] = fmt
     await _persist_session(chat_id)
     label = _FMT_LABELS[fmt]
+    session = await _get_session(chat_id)
     await _safe_edit(
         callback.message,
-        f"✅ Формат: <b>{label}</b>",
+        _t("fmt_selected", _ui(session)).format(label=label),
         reply_markup=None,
         parse_mode=ParseMode.HTML,
     )
