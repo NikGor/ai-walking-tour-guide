@@ -97,6 +97,7 @@ async def handle_chat(request: ChatRequest, db: AsyncSession) -> ChatMessage:
         llm_trace=parsed_result.llm_trace,
         map_image=parsed_result.map_image,
         wiki_image=parsed_result.wiki_image,
+        commons_image=parsed_result.commons_image,
     )
 
     logger.info("=== STEP 4: Response Ready ===")

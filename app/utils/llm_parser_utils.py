@@ -43,6 +43,7 @@ class ParsedLLMResponse(BaseModel):
     response_id: str | None = None
     map_image: bytes | None = None  # optional side-channel from tool (e.g. city tour map)
     wiki_image: bytes | None = None  # Wikipedia thumbnail for the main landmark
+    commons_image: bytes | None = None  # archival photo from Wikimedia Commons
 
 
 # ── Cost helper ───────────────────────────────────────────────────────────────

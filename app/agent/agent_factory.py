@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import logging
 import time
@@ -35,15 +36,18 @@ class AgentFactory:
         # ── Geocode + enrich ──────────────────────────────────────────────────
         location_ctx: LocationContext | None = None
         wiki_image: bytes | None = None
+        commons_image: bytes | None = None
         if has_location:
             assert request.latitude is not None and request.longitude is not None
             location_ctx = await get_location_context(request.latitude, request.longitude)
-            if location_ctx.wikipedia_image_url:
-                wiki_image = await self._fetch_image(location_ctx.wikipedia_image_url)
+            wiki_image, commons_image = await asyncio.gather(
+                self._maybe_fetch_image(location_ctx.wikipedia_image_url),
+                self._maybe_fetch_image(location_ctx.commons_image_url),
+            )
         t_geo = time.perf_counter()
 
         # ── Build messages ────────────────────────────────────────────────────
-        messages = self._build_messages(request, history, location_ctx, wiki_image)
+        messages = self._build_messages(request, history, location_ctx, wiki_image, commons_image)
         t_prompt = time.perf_counter()
 
         logger.info(
@@ -64,7 +68,9 @@ class AgentFactory:
 
         result = cast(ChatResponse, parsed.parsed_content)
         parsed.wiki_image = wiki_image
+        parsed.commons_image = commons_image
 
+        img_flags = ("  📷wiki" if wiki_image else "") + ("  🏛commons" if commons_image else "")
         logger.info(
             "\033[35mTIME ›\033[0m total=\033[33m%.1fs\033[0m  "
             "geo=\033[33m%.1fs\033[0m  prompt=\033[33m%.0fms\033[0m  llm=\033[33m%.1fs\033[0m  "
@@ -76,7 +82,7 @@ class AgentFactory:
             len(result.text.split()),
             parsed.llm_trace.total_tokens,
             parsed.llm_trace.total_cost,
-            "  📷wiki" if wiki_image else "",
+            img_flags,
         )
         return parsed
 
@@ -88,6 +94,7 @@ class AgentFactory:
         history: list[dict[str, Any]] | None,
         location_ctx: LocationContext | None,
         wiki_image: bytes | None = None,
+        commons_image: bytes | None = None,
     ) -> list[dict[str, Any]]:
         system_prompt = self._prompt_builder.build_system_prompt(request.persona.value)
         user_message = self._prompt_builder.build_user_message(
@@ -107,6 +114,15 @@ class AgentFactory:
             b64 = base64.b64encode(wiki_image).decode()
             content_parts.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
             logger.info("\033[36mWIKI ›\033[0m image attached to LLM context (%d bytes)", len(wiki_image))
+        if commons_image:
+            content_parts.append(
+                {"type": "text", "text": "[Archival photo from Wikimedia Commons — historical reference]"}
+            )
+            b64 = base64.b64encode(commons_image).decode()
+            content_parts.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
+            logger.info(
+                "\033[36mCOMM ›\033[0m archival photo attached to LLM context (%d bytes)", len(commons_image)
+            )
 
         user_content: str | list[dict[str, Any]] = user_message if len(content_parts) == 1 else content_parts
 
@@ -119,6 +135,10 @@ class AgentFactory:
             )
         messages.append({"role": "user", "content": user_content})
         return messages
+
+    @staticmethod
+    async def _maybe_fetch_image(url: str | None) -> bytes | None:
+        return await AgentFactory._fetch_image(url) if url else None
 
     @staticmethod
     async def _fetch_image(url: str) -> bytes | None:

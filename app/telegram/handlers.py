@@ -679,6 +679,7 @@ async def _dispatch(
 
     map_image: bytes | None = None
     wiki_image: bytes | None = None
+    commons_image: bytes | None = None
     conv_id = str(chat_id)
     try:
         async with AsyncSessionLocal() as db:
@@ -687,6 +688,7 @@ async def _dispatch(
         suggestions = response.suggestions
         map_image = response.map_image
         wiki_image = response.wiki_image
+        commons_image = response.commons_image
         # Don't recommend the persona that's already active
         # Filter out the currently active persona from recommendations
         recommended_personas = [p for p in response.recommended_personas if p != persona.value]
@@ -718,8 +720,14 @@ async def _dispatch(
 
     await thinking.delete()
 
-    # ── Wikipedia image (context thumbnail — no caption, text follows separately) ──
-    if wiki_image:
+    # ── Archival Commons photo (most compelling — shown with caption) ────────
+    _archive_captions = {"ru": "📷 Архивное фото", "en": "📷 Archival photo", "de": "📷 Archivfoto"}
+    if commons_image:
+        await message.answer_photo(
+            photo=BufferedInputFile(commons_image, filename="archive.jpg"),
+            caption=_archive_captions.get(_ui(session), "📷"),
+        )
+    elif wiki_image:
         await message.answer_photo(photo=BufferedInputFile(wiki_image, filename="wiki.jpg"))
 
     # ── Map / generated image — send with text as caption ────────────────────

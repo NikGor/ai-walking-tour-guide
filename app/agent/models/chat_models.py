@@ -130,6 +130,11 @@ class ChatMessage(BaseModel):
         exclude=True,
         description="Wikipedia thumbnail for the main landmark at this location",
     )
+    commons_image: bytes | None = Field(
+        default=None,
+        exclude=True,
+        description="Archival photo from Wikimedia Commons",
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="Timestamp when the message was created",

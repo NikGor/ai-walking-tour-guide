@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import urllib.parse
 from dataclasses import dataclass, field
 
@@ -26,15 +27,18 @@ class LocationContext:
     nearby: list[dict] = field(default_factory=list)  # [{name, type, wikipedia, …}]
     wikipedia_summary: str | None = None  # first paragraph from Wikipedia REST API
     wikipedia_image_url: str | None = None  # thumbnail from Wikipedia REST API
+    commons_image_url: str | None = None  # archival photo from Wikimedia Commons
 
 
 async def get_location_context(lat: float, lon: float) -> LocationContext:
     """
     Orchestrate Nominatim + Overpass in parallel, then fetch Wikipedia if a tag is found.
+    Commons archival photo is fetched in parallel with Wikipedia.
     Falls back gracefully: a failed sub-request produces empty data, not an error.
     """
     nom_task = asyncio.create_task(_fetch_nominatim(lat, lon))
     ovp_task = asyncio.create_task(_fetch_overpass(lat, lon))
+    commons_task = asyncio.create_task(_fetch_commons_image(lat, lon))
 
     nom_result, ovp_result = await asyncio.gather(nom_task, ovp_task, return_exceptions=True)
 
@@ -69,6 +73,11 @@ async def get_location_context(lat: float, lon: float) -> LocationContext:
                 ctx.wikipedia = wiki_tag_from_wd
         except Exception as e:
             logger.warning("geo_wikidata: failed for %s — %s", wikidata_id, e)
+
+    try:
+        ctx.commons_image_url = await commons_task
+    except Exception as e:
+        logger.warning("geo_commons: task failed — %s", e)
 
     return ctx
 
@@ -167,6 +176,64 @@ async def _fetch_wikipedia(tag: str) -> tuple[str | None, str | None]:
     if image_url:
         logger.info("geo_wiki: \033[32m%s\033[0m → image found", tag)
     return extract, image_url
+
+
+async def _fetch_commons_image(lat: float, lon: float) -> str | None:
+    """Search Wikimedia Commons for an archival (pre-1960) photo near these coordinates."""
+    params = {
+        "action": "query",
+        "generator": "geosearch",
+        "ggscoord": f"{lat}|{lon}",
+        "ggsradius": "500",
+        "ggslimit": "20",
+        "prop": "imageinfo",
+        "iiprop": "url|thumburl|extmetadata",
+        "iiurlwidth": "800",
+        "iiextmetadatafilter": "DateTimeOriginal|DateTime|Categories",
+        "format": "json",
+        "formatversion": "2",
+    }
+    url = "https://commons.wikimedia.org/w/api.php"
+    try:
+        async with aiohttp.ClientSession(headers=_HEADERS) as session:
+            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+    except Exception as e:
+        logger.warning("geo_commons: request failed — %s", e)
+        return None
+
+    pages = (data.get("query") or {}).get("pages") or []
+    for page in pages:
+        title = page.get("title", "")
+        if not re.search(r"\.(jpe?g|png)$", title, re.IGNORECASE):
+            continue
+        imageinfo_list = page.get("imageinfo") or []
+        if not imageinfo_list:
+            continue
+        info = imageinfo_list[0]
+        ext = info.get("extmetadata") or {}
+
+        orig_date = (ext.get("DateTimeOriginal") or ext.get("DateTime") or {}).get("value", "")
+        if orig_date:
+            m = re.match(r"(\d{4})", orig_date.strip())
+            if m and int(m.group(1)) < 1960:
+                thumb = info.get("thumburl") or info.get("url")
+                if thumb:
+                    logger.info("geo_commons: \033[32marchival photo\033[0m  year=%s", m.group(1))
+                    return thumb
+
+        year_in_title = re.search(r"\b(18\d\d|19[0-5]\d)\b", title)
+        if year_in_title:
+            thumb = info.get("thumburl") or info.get("url")
+            if thumb:
+                logger.info(
+                    "geo_commons: \033[32marchival photo\033[0m  year=%s (title)", year_in_title.group(1)
+                )
+                return thumb
+
+    return None
 
 
 # ── Context builder ────────────────────────────────────────────────────────────
