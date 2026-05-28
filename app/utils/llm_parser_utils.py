@@ -1,8 +1,10 @@
-"""LLM response parsing and token-cost tracking."""
+"""LLM response parsing, token-cost tracking, and trace aggregation."""
+
+from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -11,6 +13,9 @@ from app.agent.models.chat_models import (
     LllmTrace,
     OutputTokensDetails,
 )
+
+if TYPE_CHECKING:
+    from app.agent.models.chat_models import ChatMessage
 
 logger = logging.getLogger(__name__)
 
@@ -118,4 +123,35 @@ def parse_openrouter_response(
         parsed_content=parsed_content,
         llm_trace=llm_trace,
         response_id=getattr(raw_response, "id", None),
+    )
+
+
+# ── Conversation trace aggregation ───────────────────────────────────────────
+
+
+def calculate_conversation_llm_trace(messages: list[ChatMessage]) -> LllmTrace | None:
+    """Aggregate LLM traces from all messages in a conversation.
+
+    Returns a combined ``LllmTrace`` summing tokens and cost across all
+    assistant messages, or ``None`` if no traces are present.
+    """
+    traces = [m.llm_trace for m in messages if m.llm_trace is not None]
+    if not traces:
+        return None
+
+    total_input = sum(t.input_tokens for t in traces)
+    total_output = sum(t.output_tokens for t in traces)
+
+    return LllmTrace(
+        model=traces[-1].model,
+        input_tokens=total_input,
+        output_tokens=total_output,
+        total_tokens=total_input + total_output,
+        total_cost=sum(t.total_cost for t in traces),
+        input_tokens_details=InputTokensDetails(
+            cached_tokens=sum(t.input_tokens_details.cached_tokens for t in traces)
+        ),
+        output_tokens_details=OutputTokensDetails(
+            reasoning_tokens=sum(t.output_tokens_details.reasoning_tokens for t in traces)
+        ),
     )
