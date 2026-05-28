@@ -167,78 +167,58 @@ def _location_markup() -> InlineKeyboardMarkup | ReplyKeyboardMarkup:
     return _debug_kb() if DEBUG_MODE else _location_kb
 
 
-_PERSONA_LABELS = {
-    Persona.historian: "📜 Историк",
-    Persona.architecture_expert: "🏛 Архитектор",
-    Persona.roman_empire: "⚔️ Римская империя",
-    Persona.storyteller: "🎭 Сказитель",
-    Persona.medieval_resident: "🏚 Житель средних веков",
-    Persona.military_expert: "🗡 Военный историк",
-    Persona.deep_time: "🧊 Геолог / ледниковый период",
-}
-
-_LANG_LABELS = {
-    "auto": "🌐 Авто (по сообщению)",
-    "ru": "🇷🇺 Русский",
-    "en": "🇬🇧 English",
-    "de": "🇩🇪 Deutsch",
-}
+def _persona_labels(lang: str) -> dict:
+    slugs = [
+        "historian",
+        "architecture_expert",
+        "roman_empire",
+        "storyteller",
+        "medieval_resident",
+        "military_expert",
+        "deep_time",
+    ]
+    return {Persona(s): _t(f"persona_{s}", lang) for s in slugs}
 
 
-def _modes_kb(current: Persona) -> InlineKeyboardMarkup:
+def _lang_labels(lang: str) -> dict:
+    return {
+        "auto": _t("lang_auto", lang),
+        "ru": "🇷🇺 Русский",
+        "en": "🇬🇧 English",
+        "de": "🇩🇪 Deutsch",
+    }
+
+
+def _fmt_labels(lang: str) -> dict:
+    return {
+        "html": _t("fmt_html", lang),
+        "markdown": _t("fmt_markdown", lang),
+        "plain": _t("fmt_plain", lang),
+    }
+
+
+def _modes_kb(current: Persona, lang: str = "ru") -> InlineKeyboardMarkup:
     buttons = []
-    for persona, label in _PERSONA_LABELS.items():
+    for persona, label in _persona_labels(lang).items():
         check = "✅ " if persona == current else ""
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    text=f"{check}{label}",
-                    callback_data=f"mode:{persona.value}",
-                )
-            ]
-        )
+        buttons.append([InlineKeyboardButton(text=f"{check}{label}", callback_data=f"mode:{persona.value}")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def _lang_kb(current: str) -> InlineKeyboardMarkup:
+def _lang_kb(current: str, lang: str = "ru") -> InlineKeyboardMarkup:
     buttons = []
-    for lang, label in _LANG_LABELS.items():
-        check = "✅ " if lang == current else ""
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    text=f"{check}{label}",
-                    callback_data=f"lang:{lang}",
-                )
-            ]
-        )
+    for code, label in _lang_labels(lang).items():
+        check = "✅ " if code == current else ""
+        buttons.append([InlineKeyboardButton(text=f"{check}{label}", callback_data=f"lang:{code}")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-_FMT_LABELS = {
-    "html": "📄 HTML (рекомендуется)",
-    "markdown": "✏️ Markdown",
-    "plain": "📝 Простой текст",
-}
-
-
-def _fmt_kb(current: str) -> InlineKeyboardMarkup:
+def _fmt_kb(current: str, lang: str = "ru") -> InlineKeyboardMarkup:
     buttons = []
-    for fmt, label in _FMT_LABELS.items():
+    for fmt, label in _fmt_labels(lang).items():
         check = "✅ " if fmt == current else ""
         buttons.append([InlineKeyboardButton(text=f"{check}{label}", callback_data=f"fmt:{fmt}")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-
-_PERSONA_SWITCH_LABELS = {
-    "historian": "📜 Спросить историка",
-    "architecture_expert": "🏛 Спросить архитектора",
-    "roman_empire": "⚔️ Спросить о Риме",
-    "storyteller": "🎭 Услышать историю",
-    "medieval_resident": "🏚 Жизнь в Средние века",
-    "military_expert": "🗡 Военный взгляд",
-    "deep_time": "🧊 Взгляд геолога",
-}
 
 
 def _cb_data(prefix: str, text: str) -> str:
@@ -256,7 +236,7 @@ def _cb_data(prefix: str, text: str) -> str:
 
 
 def _suggestions_kb(
-    suggestions: list[str], recommended_personas: list[str] | None = None
+    suggestions: list[str], recommended_personas: list[str] | None = None, lang: str = "ru"
 ) -> InlineKeyboardMarkup:
     """Build a row-per-suggestion keyboard from LLM place suggestions.
 
@@ -264,8 +244,9 @@ def _suggestions_kb(
     """
     buttons = [[InlineKeyboardButton(text=s, callback_data=_cb_data("place:", s))] for s in suggestions[:3]]
     for slug in (recommended_personas or [])[:2]:
-        if slug in _PERSONA_SWITCH_LABELS:
-            label = _PERSONA_SWITCH_LABELS[slug]
+        key = f"switch_{slug}"
+        label = _t(key, lang) if f"switch_{slug}" in _UI.get(lang, _UI["ru"]) else None
+        if label:
             buttons.append([InlineKeyboardButton(text=label, callback_data=_cb_data("mode:", slug))])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -358,7 +339,7 @@ async def cmd_modes(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     persona = Persona(session.get("persona", Persona.historian))
-    await message.answer(_t("choose_style", _ui(session)), reply_markup=_modes_kb(persona))
+    await message.answer(_t("choose_style", _ui(session)), reply_markup=_modes_kb(persona, _ui(session)))
 
 
 @router.message(Command("lang"))
@@ -366,7 +347,7 @@ async def cmd_lang(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     lang = session.get("lang", "auto")
-    await message.answer(_t("choose_lang", _ui(session)), reply_markup=_lang_kb(lang))
+    await message.answer(_t("choose_lang", _ui(session)), reply_markup=_lang_kb(lang, _ui(session)))
 
 
 @router.message(Command("fmt"))
@@ -374,7 +355,7 @@ async def cmd_fmt(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     fmt = session.get("fmt", RESPONSE_FORMAT)
-    await message.answer(_t("choose_fmt", _ui(session)), reply_markup=_fmt_kb(fmt))
+    await message.answer(_t("choose_fmt", _ui(session)), reply_markup=_fmt_kb(fmt, _ui(session)))
 
 
 @router.message(Command("voice"))
@@ -454,9 +435,9 @@ async def cmd_settings(message: Message) -> None:
     loc_str = f"{lat:.4f}, {lon:.4f}" if lat else _t("settings_location_none", lang_ui)
     lines = [
         _t("settings_header", lang_ui),
-        _t("settings_style", lang_ui).format(label=_PERSONA_LABELS[persona]),
-        _t("settings_lang", lang_ui).format(label=_LANG_LABELS[lang]),
-        _t("settings_fmt", lang_ui).format(label=_FMT_LABELS.get(fmt, fmt)),
+        _t("settings_style", lang_ui).format(label=_persona_labels(lang_ui)[persona]),
+        _t("settings_lang", lang_ui).format(label=_lang_labels(lang_ui)[lang]),
+        _t("settings_fmt", lang_ui).format(label=_fmt_labels(lang_ui).get(fmt, fmt)),
         _t("settings_voice_on" if voice else "settings_voice_off", lang_ui),
         _t("settings_location", lang_ui).format(loc=loc_str),
         f"🆔 Chat ID: <code>{chat_id}</code>",
@@ -476,8 +457,8 @@ async def cb_mode(callback: CallbackQuery) -> None:
     session = await _get_session(chat_id)
     session["persona"] = persona.value
     await _persist_session(chat_id)
-    label = _PERSONA_LABELS[persona]
     lang_ui = _ui(session)
+    label = _persona_labels(lang_ui)[persona]
     await _safe_edit(
         callback.message,
         _t("style_selected", lang_ui).format(label=label),
@@ -493,10 +474,11 @@ async def cb_lang(callback: CallbackQuery) -> None:
     session = await _get_session(chat_id)
     session["lang"] = lang
     await _persist_session(chat_id)
-    label = _LANG_LABELS[lang]
+    lang_ui = _ui(session)
+    label = _lang_labels(lang_ui)[lang]
     await _safe_edit(
         callback.message,
-        _t("lang_selected", _ui(session)).format(label=label),
+        _t("lang_selected", lang_ui).format(label=label),
         reply_markup=None,
     )
     await callback.answer()
@@ -538,8 +520,8 @@ async def cb_fmt(callback: CallbackQuery) -> None:
     session = await _get_session(chat_id)
     session["fmt"] = fmt
     await _persist_session(chat_id)
-    label = _FMT_LABELS[fmt]
-    session = await _get_session(chat_id)
+    lang_ui = _ui(session)
+    label = _fmt_labels(lang_ui).get(fmt, fmt)
     await _safe_edit(
         callback.message,
         _t("fmt_selected", _ui(session)).format(label=label),
@@ -712,7 +694,7 @@ async def _dispatch(
     if not session.get("lat"):
         markup = _location_markup()
     elif has_buttons:
-        markup = _suggestions_kb(suggestions, recommended_personas)
+        markup = _suggestions_kb(suggestions, recommended_personas, lang=_ui(session))
     else:
         markup = None
 
