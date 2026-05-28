@@ -121,20 +121,21 @@ async def _persist_session(chat_id: int) -> None:
 
 # ── Keyboards ─────────────────────────────────────────────────────────────────
 
-_location_button = KeyboardButton(text="📍 Локация", request_location=True)
-
-# Time Travel Mini App button — only shown when APP_BASE_URL is configured (HTTPS required by Telegram).
 _APP_BASE_URL = os.getenv("APP_BASE_URL", "").rstrip("/")
-if _APP_BASE_URL:
-    _time_travel_button = KeyboardButton(
-        text="🕰 Машина времени",
-        web_app=WebAppInfo(url=f"{_APP_BASE_URL}/time-travel"),
-    )
-    _kb_row = [_location_button, _time_travel_button]
-else:
-    _kb_row = [_location_button]
 
-_location_kb = ReplyKeyboardMarkup(keyboard=[_kb_row], resize_keyboard=True, is_persistent=True)
+
+def _location_kb(lang: str = "ru") -> ReplyKeyboardMarkup:
+    loc_btn = KeyboardButton(text=_t("btn_location", lang), request_location=True)
+    if _APP_BASE_URL:
+        tt_btn = KeyboardButton(
+            text=_t("btn_time_travel", lang),
+            web_app=WebAppInfo(url=f"{_APP_BASE_URL}/time-travel"),
+        )
+        row = [loc_btn, tt_btn]
+    else:
+        row = [loc_btn]
+    return ReplyKeyboardMarkup(keyboard=[row], resize_keyboard=True, is_persistent=True)
+
 
 # ── Debug samples keyboard ────────────────────────────────────────────────────
 
@@ -175,9 +176,9 @@ def _debug_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def _location_markup() -> InlineKeyboardMarkup | ReplyKeyboardMarkup:
+def _location_markup(lang: str = "ru") -> InlineKeyboardMarkup | ReplyKeyboardMarkup:
     """Return debug sample buttons or the real location keyboard depending on DEBUG_MODE."""
-    return _debug_kb() if DEBUG_MODE else _location_kb
+    return _debug_kb() if DEBUG_MODE else _location_kb(lang)
 
 
 def _persona_labels(lang: str) -> dict:
@@ -273,7 +274,7 @@ def _suggestions_kb(
 @router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     session = await _get_session(message.chat.id)
-    await message.answer(_t("help", _ui(session)), reply_markup=_location_markup())
+    await message.answer(_t("help", _ui(session)), reply_markup=_location_markup(_ui(session)))
 
 
 @router.message(Command("help"))
@@ -287,7 +288,7 @@ async def cmd_whereami(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     if session.get("lat") is None:
-        await message.answer(_t("no_location", _ui(session)), reply_markup=_location_markup())
+        await message.answer(_t("no_location", _ui(session)), reply_markup=_location_markup(_ui(session)))
         return
     await _dispatch(message, lat=session["lat"], lon=session["lon"], user_message=None)
 
@@ -297,7 +298,7 @@ async def cmd_continue(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     if session.get("lat") is None:
-        await message.answer(_t("no_location", _ui(session)), reply_markup=_location_markup())
+        await message.answer(_t("no_location", _ui(session)), reply_markup=_location_markup(_ui(session)))
         return
     await _dispatch(
         message,
@@ -344,7 +345,7 @@ async def cmd_tour(message: Message) -> None:
         )
         await _dispatch(message, lat=lat, lon=lon, user_message=user_message)
     else:
-        await message.answer(_t("tour_help", _ui(session)), reply_markup=_location_markup())
+        await message.answer(_t("tour_help", _ui(session)), reply_markup=_location_markup(_ui(session)))
 
 
 @router.message(Command("modes"))
@@ -394,7 +395,7 @@ async def cmd_new(message: Message) -> None:
     session["lon"] = None
     await _persist_session(chat_id)
     logger.info("\033[34mTG   ›\033[0m new conversation  chat=\033[36m%d\033[0m", chat_id)
-    await message.answer(_t("new_conv", _ui(session)), reply_markup=_location_markup())
+    await message.answer(_t("new_conv", _ui(session)), reply_markup=_location_markup(_ui(session)))
 
 
 @router.message(Command("history"))
@@ -609,7 +610,9 @@ async def handle_photo(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
     if session.get("lat") is None:
-        await message.answer("Сначала отправь геолокацию 📍, потом фото.", reply_markup=_location_markup())
+        await message.answer(
+            _t("photo_no_location", _ui(session)), reply_markup=_location_markup(_ui(session))
+        )
         return
 
     photo = message.photo[-1]
@@ -707,7 +710,7 @@ async def _dispatch(
     # No location yet → show the persistent location keyboard so user can share.
     # Location is known → show inline suggestions (reply keyboard persists independently).
     if not session.get("lat"):
-        markup = _location_markup()
+        markup = _location_markup(_ui(session))
     elif has_buttons:
         markup = _suggestions_kb(suggestions, recommended_personas, lang=_ui(session))
     else:

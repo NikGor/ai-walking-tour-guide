@@ -47,7 +47,10 @@
     "switch_storyteller": "🎭 Услышать историю",
     "switch_medieval_resident": "🏚 Жизнь в Средние века",
     "switch_military_expert": "🗡 Военный взгляд",
-    "switch_deep_time": "🧊 Взгляд геолога"
+    "switch_deep_time": "🧊 Взгляд геолога",
+    "btn_location": "📍 Локация",
+    "btn_time_travel": "🕰 Машина времени",
+    "photo_no_location": "Сначала отправь геолокацию 📍, потом фото."
   },
   "en": {
     "help": "🗺 <b>Solaris Pliny</b> — your personal historian\n\n<b>How to use:</b>\n1. Send 📍 your location — get the history of that spot\n2. Ask a question — dig deeper or ask about something nearby\n3. Send a photo — the bot identifies the landmark and tells its story\n4. Tap 🕰 <b>Time Machine</b> — see how the place looked in any era\n\n<b>Commands:</b>\n/whereami — story of the current location\n/continue — continue the narrative\n/tour — walking city tour 🗺\n/modes — narrative style\n/lang — response language\n/fmt — text format (HTML / Markdown)\n/voice — toggle voice replies 🔊\n/new — start a new conversation\n/history — session stats\n/settings — all settings\n/help — this reference",
@@ -97,7 +100,10 @@
     "switch_storyteller": "🎭 Hear a story",
     "switch_medieval_resident": "🏚 Medieval life",
     "switch_military_expert": "🗡 Military view",
-    "switch_deep_time": "🧊 Geologist's view"
+    "switch_deep_time": "🧊 Geologist's view",
+    "btn_location": "📍 Location",
+    "btn_time_travel": "🕰 Time Machine",
+    "photo_no_location": "Send your location 📍 first, then a photo."
   },
   "de": {
     "help": "🗺 <b>Solaris Pliny</b> — dein persönlicher Historiker\n\n<b>Verwendung:</b>\n1. Sende 📍 deinen Standort — erhalte die Geschichte dieses Ortes\n2. Stelle eine Frage — tauche tiefer ein oder frage nach etwas in der Nähe\n3. Sende ein Foto — der Bot erkennt das Gebäude und erzählt seine Geschichte\n4. Tippe auf 🕰 <b>Zeitmaschine</b> — sieh, wie der Ort in einer anderen Epoche aussah\n\n<b>Befehle:</b>\n/whereami — Geschichte des aktuellen Ortes\n/continue — Erzählung fortsetzen\n/tour — Stadtrundgang 🗺\n/modes — Erzählstil\n/lang — Antwortsprache\n/fmt — Textformat (HTML / Markdown)\n/voice — Sprachantworten ein/aus 🔊\n/new — Neues Gespräch starten\n/history — Sitzungsstatistik\n/settings — Alle Einstellungen\n/help — Diese Hilfe",
@@ -147,6 +153,9 @@
     "switch_storyteller": "🎭 Eine Geschichte hören",
     "switch_medieval_resident": "🏚 Mittelalterliches Leben",
     "switch_military_expert": "🗡 Militärische Sicht",
-    "switch_deep_time": "🧊 Geologische Sicht"
+    "switch_deep_time": "🧊 Geologische Sicht",
+    "btn_location": "📍 Standort",
+    "btn_time_travel": "🕰 Zeitmaschine",
+    "photo_no_location": "Sende zuerst deinen Standort 📍, dann ein Foto."
   }
 }
