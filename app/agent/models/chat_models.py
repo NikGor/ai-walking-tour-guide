@@ -77,34 +77,6 @@ class LllmTrace(BaseModel):
     total_cost: float = Field(default=0.0, description="Total cost of the API call in USD")
 
 
-# ── Pipeline tracing ──────────────────────────────────────────────────────────
-
-
-class PipelineStep(BaseModel):
-    """Single pipeline step timing record."""
-
-    step: str = Field(description="Name of the pipeline step")
-    status: str = Field(description="Status of the step")
-    duration_ms: int = Field(description="Duration of the step in milliseconds")
-
-
-class StepTrace(BaseModel):
-    """Timing and LLM usage data for a single pipeline stage."""
-
-    duration_ms: int = Field(description="Duration of the stage in milliseconds")
-    llm_trace: LllmTrace | None = Field(
-        default=None,
-        description="LLM usage trace for this stage, if it involved an LLM call",
-    )
-
-
-class PipelineTrace(BaseModel):
-    """Aggregated trace for all stages of a single agent request."""
-
-    total_ms: int = Field(description="Total duration of the request in milliseconds")
-    steps: list[StepTrace] = Field(default_factory=list, description="Per-stage traces")
-
-
 # ── Chat models ───────────────────────────────────────────────────────────────
 
 
@@ -147,14 +119,6 @@ class ChatMessage(BaseModel):
     )
     model: str | None = Field(default=None, description="LLM model used to generate this message")
     llm_trace: LllmTrace | None = Field(default=None, description="LLM usage trace for this message")
-    pipeline_steps: list[PipelineStep] = Field(
-        default_factory=list,
-        description="Pipeline step timings for this message",
-    )
-    pipeline_trace: PipelineTrace | None = Field(
-        default=None,
-        description="Detailed per-stage pipeline trace from the AI agent",
-    )
 
 
 class Conversation(BaseModel):
@@ -219,35 +183,3 @@ class ChatRequest(BaseModel):
         default=None,
         description="Force response language: 'ru', 'en', 'de'. None = auto-detect from message.",
     )
-
-
-class ConversationRequest(BaseModel):
-    """Request model for creating a new conversation."""
-
-    conversation_id: str | None = Field(
-        default=None,
-        description="Optional custom conversation ID. Auto-generated if not provided.",
-    )
-    title: str | None = Field(default="Walking Tour", description="Title of the conversation")
-
-
-class ConversationResponse(BaseModel):
-    """Response model for conversation creation."""
-
-    conversation_id: str = Field(description="ID of the created conversation")
-    title: str = Field(description="Title of the conversation")
-    created_at: datetime = Field(description="Timestamp when the conversation was created")
-    message: str = Field(default="Conversation created successfully", description="Success message")
-
-
-class ChatHistoryMessage(BaseModel):
-    """Simplified message model for chat history."""
-
-    role: Literal["user", "assistant", "system"] = Field(description="Role of the message sender")
-    content: Content = Field(description="Structured content of the message")
-
-
-class ChatHistoryResponse(BaseModel):
-    """Response model for chat history endpoint."""
-
-    messages: list[ChatHistoryMessage] = Field(description="List of messages in the conversation")
