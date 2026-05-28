@@ -14,14 +14,8 @@ logger = logging.getLogger(__name__)
 
 _OPENROUTER_TTS_URL = "https://openrouter.ai/api/v1/audio/speech"
 
-_TTS_MODEL = "openai/gpt-4o-mini-tts"
+_TTS_MODEL = "openai/gpt-4o-mini-tts-2025-12-15"
 _TTS_VOICE = "alloy"  # neutral/academic; good for Russian long-form narrative
-
-# Style instruction — a single English sentence works best even for Russian content.
-_TTS_INSTRUCTIONS = (
-    "You are a documentary narrator — calm, authoritative, and engaging. "
-    "Speak clearly at a measured pace. Preserve the original language of the text."
-)
 
 # ~1500 chars ≈ 70–80 s of audio — comfortable Telegram voice message length.
 _MAX_CHARS = 1500
@@ -55,7 +49,6 @@ async def synthesise(text: str) -> bytes | None:
         "model": _TTS_MODEL,
         "voice": _TTS_VOICE,
         "input": clean,
-        "instructions": _TTS_INSTRUCTIONS,
         "response_format": "mp3",
     }
     headers = {
@@ -67,10 +60,14 @@ async def synthesise(text: str) -> bytes | None:
         logger.info("tts_002: synthesising %d chars  model=%s  voice=%s", len(clean), _TTS_MODEL, _TTS_VOICE)
         async with httpx.AsyncClient() as client:
             resp = await client.post(_OPENROUTER_TTS_URL, json=payload, headers=headers, timeout=30.0)
-            resp.raise_for_status()
+            if not resp.is_success:
+                logger.error("tts_error_001: HTTP %d — %s", resp.status_code, resp.text)
+                resp.raise_for_status()
             audio = resp.content
         logger.info("tts_003: audio ready  %d bytes", len(audio))
         return audio
+    except httpx.HTTPStatusError:
+        return None
     except Exception as e:
-        logger.error("tts_error_001: TTS failed: %s", e, exc_info=True)
+        logger.error("tts_error_002: TTS failed: %s", e, exc_info=True)
         return None
