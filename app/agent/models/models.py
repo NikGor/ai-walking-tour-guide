@@ -176,7 +176,7 @@ class Conversation(BaseModel):
     def __init__(self, **data):
         super().__init__(**data)
         if self.messages:
-            from .utils import calculate_conversation_llm_trace
+            from app.utils.models_utils import calculate_conversation_llm_trace
 
             self.llm_trace = calculate_conversation_llm_trace(self.messages)
 

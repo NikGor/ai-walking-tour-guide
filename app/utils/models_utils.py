@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .models import ChatMessage, LllmTrace
+    from app.agent.models.models import ChatMessage, LllmTrace
 
 
 def calculate_conversation_llm_trace(
@@ -16,7 +16,7 @@ def calculate_conversation_llm_trace(
     Returns a combined ``LllmTrace`` summing tokens and cost across all
     assistant messages, or ``None`` if no traces are present.
     """
-    from .models import InputTokensDetails, LllmTrace, OutputTokensDetails
+    from app.agent.models.models import InputTokensDetails, LllmTrace, OutputTokensDetails
 
     traces = [m.llm_trace for m in messages if m.llm_trace is not None]
     if not traces:
