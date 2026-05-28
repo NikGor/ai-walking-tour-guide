@@ -21,7 +21,6 @@ from sqlalchemy import func, select
 
 from app.agent.models.models import ChatRequest, Persona
 from app.api_controller import handle_chat
-from app.config import RESPONSE_FORMAT
 from app.db.orm_models import ConversationORM, MessageORM
 from app.db.repository import get_user_settings, upsert_user_settings
 from app.db.session import AsyncSessionLocal
@@ -29,6 +28,7 @@ from app.db.session import AsyncSessionLocal
 # ── Debug mode ────────────────────────────────────────────────────────────────
 
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() in ("1", "true", "yes")
+RESPONSE_FORMAT: str = os.getenv("SOLARIS_RESPONSE_FORMAT", "html")
 
 _PARSE_MODES: dict[str, ParseMode] = {
     "html": ParseMode.HTML,
