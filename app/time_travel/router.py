@@ -30,6 +30,9 @@ async def time_travel_app() -> HTMLResponse:
     # Inject the API base URL so the frontend knows where to call
     api_base = os.getenv("APP_BASE_URL", "")
     html = html.replace("__API_BASE__", api_base)
+    # Reveal debug-only UI (sample locations) when DEBUG_MODE is on
+    debug = os.getenv("DEBUG_MODE", "false").lower() in ("1", "true", "yes")
+    html = html.replace("__DEBUG__", "true" if debug else "false")
     return HTMLResponse(content=html)
 
 

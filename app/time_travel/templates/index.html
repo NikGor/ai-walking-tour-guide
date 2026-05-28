@@ -438,17 +438,19 @@
     <span class="loc-change" id="loc-change"></span>
   </div>
 
-  <!-- Sample locations -->
-  <div class="section-label">Места для теста</div>
-  <div class="sample-strip" id="sample-strip">
-    <button class="sample-btn" onclick="setSampleLocation(0)">🏛 Ватикан</button>
-    <button class="sample-btn" onclick="setSampleLocation(1)">🌉 Tower Bridge</button>
-    <button class="sample-btn" onclick="setSampleLocation(2)">🎨 Монмартр</button>
-    <button class="sample-btn" onclick="setSampleLocation(3)">🗼 Эйфелева</button>
-    <button class="sample-btn" onclick="setSampleLocation(4)">🖼 Лувр</button>
-    <button class="sample-btn" onclick="setSampleLocation(5)">⚔️ Колизей</button>
-    <button class="sample-btn" onclick="setSampleLocation(6)">👑 Букингем</button>
-    <button class="sample-btn" onclick="setSampleLocation(7)">🏛 Парламент</button>
+  <!-- Sample locations (debug only — hidden in production) -->
+  <div id="sample-section" style="display:none">
+    <div class="section-label">Места для теста</div>
+    <div class="sample-strip" id="sample-strip">
+      <button class="sample-btn" onclick="setSampleLocation(0)">🏛 Ватикан</button>
+      <button class="sample-btn" onclick="setSampleLocation(1)">🌉 Tower Bridge</button>
+      <button class="sample-btn" onclick="setSampleLocation(2)">🎨 Монмартр</button>
+      <button class="sample-btn" onclick="setSampleLocation(3)">🗼 Эйфелева</button>
+      <button class="sample-btn" onclick="setSampleLocation(4)">🖼 Лувр</button>
+      <button class="sample-btn" onclick="setSampleLocation(5)">⚔️ Колизей</button>
+      <button class="sample-btn" onclick="setSampleLocation(6)">👑 Букингем</button>
+      <button class="sample-btn" onclick="setSampleLocation(7)">🏛 Парламент</button>
+    </div>
   </div>
 
   <!-- Time selection -->
@@ -627,6 +629,13 @@
 
   // ── API base ───────────────────────────────────────────────────────────────
   const API_BASE = '__API_BASE__' || window.location.origin;
+
+  // ── Debug mode — reveal sample-location shortcuts (hidden in production) ──────
+  const DEBUG = '__DEBUG__' === 'true';
+  if (DEBUG) {
+    const s = document.getElementById('sample-section');
+    if (s) s.style.display = 'block';
+  }
 
   // ── Screens ────────────────────────────────────────────────────────────────
   function showScreen(id) {

@@ -1,6 +1,6 @@
 {
   "ru": {
-    "help": "🗺 <b>Solaris Pliny</b> — твой личный историк\n\n📍 Отправь геолокацию — получи историю места\n📸 Отправь фото — определю объект и расскажу\n🕰 Нажми <b>Машина времени</b> — посмотри место в другую эпоху\n💬 Задай вопрос — копну глубже\n\n/whereami — история текущего места\n/tour — пешеходный тур по городу\n/settings — стиль, язык, голос\n/new — начать заново",
+    "help": "🗺 <b>Solaris Pliny</b> — твой личный историк\n\n📍 Отправь геолокацию — получи историю места\n📸 Отправь фото — определю объект и расскажу\n🎭 Смени рассказчика — историк, римлянин, геолог, военный… → /modes\n🕰 Нажми <b>Машина времени</b> — посмотри место в другую эпоху\n💬 Задай вопрос — копну глубже\n\n/whereami — история текущего места\n/tour — пешеходный тур по городу\n/settings — стиль, язык, голос\n/new — начать заново",
     "no_location": "Сначала отправь геолокацию 📍",
     "choose_style": "Выбери стиль рассказа:",
     "choose_lang": "Выбери язык ответов:",
@@ -24,7 +24,7 @@
     "settings_voice_off": "🔇 Голос: <b>выключен</b>",
     "settings_location": "📍 Последняя локация: <code>{loc}</code>",
     "settings_location_none": "не задана",
-    "settings_btn_reset": "🔄 Сбросить",
+    "settings_btn_reset": "🔄 Новый разговор",
     "tour_help": "🗺 <b>Тур по городу</b>\n\nОтправь локацию 📍 чтобы я определил город автоматически, или укажи город явно:\n\n<code>/tour Рим</code>\n<code>/tour Saint Petersburg</code>",
     "style_selected": "✅ Стиль: <b>{label}</b>\n\nОтправь локацию или /whereami чтобы получить рассказ.\n/continue — продолжить с новой персоной.",
     "lang_selected": "✅ Язык: <b>{label}</b>",
@@ -53,7 +53,7 @@
     "photo_no_location": "Сначала отправь геолокацию 📍, потом фото."
   },
   "en": {
-    "help": "🗺 <b>Solaris Pliny</b> — your personal historian\n\n📍 Send location — get the story of that spot\n📸 Send a photo — I'll identify the landmark\n🕰 Tap <b>Time Machine</b> — see the place in another era\n💬 Ask a question — I'll dig deeper\n\n/whereami — story of the current spot\n/tour — walking city tour\n/settings — style, language, voice\n/new — start over",
+    "help": "🗺 <b>Solaris Pliny</b> — your personal historian\n\n📍 Send location — get the story of that spot\n📸 Send a photo — I'll identify the landmark\n🎭 Switch narrator — historian, Roman, geologist, military… → /modes\n🕰 Tap <b>Time Machine</b> — see the place in another era\n💬 Ask a question — I'll dig deeper\n\n/whereami — story of the current spot\n/tour — walking city tour\n/settings — style, language, voice\n/new — start over",
     "no_location": "Send your location first 📍",
     "choose_style": "Choose a narrative style:",
     "choose_lang": "Choose response language:",
@@ -77,7 +77,7 @@
     "settings_voice_off": "🔇 Voice: <b>off</b>",
     "settings_location": "📍 Last location: <code>{loc}</code>",
     "settings_location_none": "not set",
-    "settings_btn_reset": "🔄 Reset",
+    "settings_btn_reset": "🔄 New chat",
     "tour_help": "🗺 <b>City tour</b>\n\nSend your location 📍 for automatic city detection, or specify a city:\n\n<code>/tour Rome</code>\n<code>/tour Saint Petersburg</code>",
     "style_selected": "✅ Style: <b>{label}</b>\n\nSend a location or use /whereami to get a story.\n/continue — continue with the new persona.",
     "lang_selected": "✅ Language: <b>{label}</b>",
@@ -106,7 +106,7 @@
     "photo_no_location": "Send your location 📍 first, then a photo."
   },
   "de": {
-    "help": "🗺 <b>Solaris Pliny</b> — dein persönlicher Historiker\n\n📍 Standort senden — Geschichte dieses Ortes\n📸 Foto senden — ich erkenne das Gebäude\n🕰 <b>Zeitmaschine</b> tippen — sieh den Ort in einer anderen Epoche\n💬 Frag mich — ich tauche tiefer\n\n/whereami — Geschichte dieses Ortes\n/tour — Stadtrundgang\n/settings — Stil, Sprache, Stimme\n/new — neu starten",
+    "help": "🗺 <b>Solaris Pliny</b> — dein persönlicher Historiker\n\n📍 Standort senden — Geschichte dieses Ortes\n📸 Foto senden — ich erkenne das Gebäude\n🎭 Erzähler wechseln — Historiker, Römer, Geologe, Militär… → /modes\n🕰 <b>Zeitmaschine</b> tippen — sieh den Ort in einer anderen Epoche\n💬 Frag mich — ich tauche tiefer\n\n/whereami — Geschichte dieses Ortes\n/tour — Stadtrundgang\n/settings — Stil, Sprache, Stimme\n/new — neu starten",
     "no_location": "Sende zuerst deinen Standort 📍",
     "choose_style": "Wähle einen Erzählstil:",
     "choose_lang": "Wähle die Antwortsprache:",
@@ -130,7 +130,7 @@
     "settings_voice_off": "🔇 Stimme: <b>inaktiv</b>",
     "settings_location": "📍 Letzter Standort: <code>{loc}</code>",
     "settings_location_none": "nicht gesetzt",
-    "settings_btn_reset": "🔄 Zurücksetzen",
+    "settings_btn_reset": "🔄 Neuer Chat",
     "tour_help": "🗺 <b>Stadtrundgang</b>\n\nSende deinen Standort 📍 zur automatischen Stadterkennung oder gib eine Stadt an:\n\n<code>/tour Rom</code>\n<code>/tour Sankt Petersburg</code>",
     "style_selected": "✅ Stil: <b>{label}</b>\n\nSende einen Standort oder nutze /whereami für eine Geschichte.\n/continue — mit neuer Persona fortfahren.",
     "lang_selected": "✅ Sprache: <b>{label}</b>",

@@ -470,17 +470,17 @@ def _settings_text(session: dict, lang_ui: str, chat_id: int) -> str:
     lat = session.get("lat")
     lon = session.get("lon")
     loc_str = f"{lat:.4f}, {lon:.4f}" if lat else _t("settings_location_none", lang_ui)
-    return "\n".join(
-        [
-            _t("settings_header", lang_ui),
-            _t("settings_style", lang_ui).format(label=_persona_labels(lang_ui)[persona]),
-            _t("settings_lang", lang_ui).format(label=_lang_labels(lang_ui)[lang]),
-            _t("settings_fmt", lang_ui).format(label=_fmt_labels(lang_ui).get(fmt, fmt)),
-            _t("settings_voice_on" if voice else "settings_voice_off", lang_ui),
-            _t("settings_location", lang_ui).format(loc=loc_str),
-            f"🆔 Chat ID: <code>{chat_id}</code>",
-        ]
-    )
+    lines = [
+        _t("settings_header", lang_ui),
+        _t("settings_style", lang_ui).format(label=_persona_labels(lang_ui)[persona]),
+        _t("settings_lang", lang_ui).format(label=_lang_labels(lang_ui)[lang]),
+        _t("settings_fmt", lang_ui).format(label=_fmt_labels(lang_ui).get(fmt, fmt)),
+        _t("settings_voice_on" if voice else "settings_voice_off", lang_ui),
+        _t("settings_location", lang_ui).format(loc=loc_str),
+    ]
+    if DEBUG_MODE:
+        lines.append(f"🆔 Chat ID: <code>{chat_id}</code>")
+    return "\n".join(lines)
 
 
 @router.message(Command("settings"))
