@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import re
 import urllib.parse
 from dataclasses import dataclass, field
@@ -10,7 +11,10 @@ logger = logging.getLogger(__name__)
 
 _NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 _OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-_HEADERS = {"User-Agent": "SolarisPliny/1.0 (github.com/NikGor/ai-walking-tour-guide)"}
+# Wikimedia's UA policy rejects (403) agents without a full URL scheme + contact;
+# Nominatim/Overpass accept the same string, so it's shared.
+USER_AGENT = "SolarisPliny/1.0 (https://github.com/NikGor/ai-walking-tour-guide; nicolas.gordienko@gmail.com)"
+_HEADERS = {"User-Agent": USER_AGENT}
 
 
 @dataclass
@@ -105,6 +109,16 @@ async def _fetch_nominatim(lat: float, lon: float) -> dict:
             return await resp.json()
 
 
+def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in metres between two lat/lon points."""
+    r = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlmb = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
 async def _fetch_overpass(lat: float, lon: float, radius: int = 150) -> list[dict]:
     query = f"""
 [out:json][timeout:8];
@@ -113,8 +127,12 @@ async def _fetch_overpass(lat: float, lon: float, radius: int = 150) -> list[dic
   way["historic"](around:{radius},{lat},{lon});
   node["tourism"~"^(museum|attraction|artwork|monument|gallery)$"](around:{radius},{lat},{lon});
   way["tourism"~"^(museum|attraction|artwork|monument|gallery)$"](around:{radius},{lat},{lon});
+  node["amenity"~"^(pub|place_of_worship|theatre|restaurant)$"](around:{radius},{lat},{lon});
+  way["amenity"~"^(pub|place_of_worship|theatre|restaurant)$"](around:{radius},{lat},{lon});
+  nwr["wikipedia"](around:{radius},{lat},{lon});
+  nwr["wikidata"](around:{radius},{lat},{lon});
 );
-out tags center 15;
+out tags center 25;
 """
     async with aiohttp.ClientSession(headers=_HEADERS) as session:
         async with session.post(
@@ -132,12 +150,44 @@ out tags center 15;
         if not name:
             continue
         poi: dict = {"name": name}
-        for key in ("historic", "tourism", "wikipedia", "wikidata", "architect", "start_date", "description"):
+        _keep = (
+            "historic",
+            "tourism",
+            "amenity",
+            "wikipedia",
+            "wikidata",
+            "architect",
+            "start_date",
+            "description",
+        )
+        for key in _keep:
             val = tags.get(key)
             if val:
                 poi[key] = val
+        # Coordinates: nodes carry lat/lon directly, ways/relations via `center`
+        center = el.get("center") or el
+        plat, plon = center.get("lat"), center.get("lon")
+        dist = _haversine_m(lat, lon, plat, plon) if plat is not None else 1e9
+        # Drop long linear features (rivers, hiking routes) that touch the search
+        # radius but whose centroid is far away — they'd hijack the Wikipedia anchor.
+        if dist > radius + 100:
+            continue
+        poi["_dist"] = dist
         pois.append(poi)
 
+    # Closest notable feature first — so the Wikipedia anchor matches what the user stands on
+    pois.sort(key=lambda p: p["_dist"])
+    for p in pois:
+        cat = p.get("amenity") or p.get("historic") or p.get("tourism") or "—"
+        wiki = "📖" if p.get("wikipedia") or p.get("wikidata") else "  "
+        logger.info(
+            "geo_poi: %s %5.0fm  \033[36m%-30.30s\033[0m %s",
+            wiki,
+            p["_dist"],
+            p["name"],
+            cat,
+        )
+        p.pop("_dist", None)
     return pois
 
 

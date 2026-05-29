@@ -10,7 +10,7 @@ from app.agent.function_runner import run_agentic_loop
 from app.agent.models.chat_models import ChatRequest, ChatResponse
 from app.agent.prompt_builder import PromptBuilder
 from app.backend.openrouter_client import OpenRouterClient
-from app.utils.geocoder_utils import LocationContext, get_location_context
+from app.utils.geocoder_utils import USER_AGENT, LocationContext, get_location_context
 from app.utils.llm_parser_utils import ParsedLLMResponse
 from app.utils.registry_utils import get_tools
 
@@ -69,6 +69,10 @@ class AgentFactory:
         result = cast(ChatResponse, parsed.parsed_content)
         parsed.wiki_image = wiki_image
         parsed.commons_image = commons_image
+        # Public URL of the representative photo — archival Commons preferred, else the
+        # Wikipedia landmark thumbnail. Mirrors the photo priority of the Telegram handler.
+        if location_ctx is not None:
+            parsed.image_url = location_ctx.commons_image_url or location_ctx.wikipedia_image_url
 
         img_flags = ("  📷wiki" if wiki_image else "") + ("  🏛commons" if commons_image else "")
         logger.info(
@@ -142,7 +146,7 @@ class AgentFactory:
 
     @staticmethod
     async def _fetch_image(url: str) -> bytes | None:
-        headers = {"User-Agent": "SolarisPliny/1.0 (github.com/NikGor/ai-walking-tour-guide)"}
+        headers = {"User-Agent": USER_AGENT}
         try:
             async with httpx.AsyncClient(headers=headers) as client:
                 resp = await client.get(url, timeout=8.0, follow_redirects=True)

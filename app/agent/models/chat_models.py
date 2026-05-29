@@ -107,6 +107,10 @@ class ChatMessage(BaseModel):
         exclude=True,
         description="Archival photo from Wikimedia Commons",
     )
+    image_url: str | None = Field(
+        default=None,
+        description="Public URL of the representative photo for this location (Commons or Wikipedia)",
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="Timestamp when the message was created",
