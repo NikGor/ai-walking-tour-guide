@@ -58,4 +58,7 @@ class UserSettingsORM(Base):
     lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     lon: Mapped[float | None] = mapped_column(Float, nullable=True)
     voice: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Conversation the chat is currently in; rotated by /new so a fresh DB
+    # conversation starts and prior history is no longer fed to the LLM.
+    active_conversation_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)

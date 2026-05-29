@@ -136,6 +136,7 @@ async def get_user_settings(db: AsyncSession, chat_id: int) -> dict:
             "lat": None,
             "lon": None,
             "voice": False,
+            "conversation_id": None,
         }  # noqa: E501
     return {
         "persona": row.persona,
@@ -144,6 +145,7 @@ async def get_user_settings(db: AsyncSession, chat_id: int) -> dict:
         "lat": row.lat,
         "lon": row.lon,
         "voice": bool(row.voice),
+        "conversation_id": row.active_conversation_id,
     }
 
 
@@ -156,16 +158,22 @@ async def upsert_user_settings(
     lat: float | None,
     lon: float | None,
     voice: bool = False,
+    active_conversation_id: str | None = None,
 ) -> None:
     """Insert or update user settings for a Telegram chat — race-safe upsert."""
-    values = dict(chat_id=chat_id, persona=persona, lang=lang, fmt=fmt, lat=lat, lon=lon, voice=voice)
+    cols = dict(
+        persona=persona,
+        lang=lang,
+        fmt=fmt,
+        lat=lat,
+        lon=lon,
+        voice=voice,
+        active_conversation_id=active_conversation_id,
+    )
     stmt = (
         _dialect_insert(UserSettingsORM)
-        .values(**values)
-        .on_conflict_do_update(
-            index_elements=["chat_id"],
-            set_=dict(persona=persona, lang=lang, fmt=fmt, lat=lat, lon=lon, voice=voice),
-        )
+        .values(chat_id=chat_id, **cols)
+        .on_conflict_do_update(index_elements=["chat_id"], set_=cols)
     )
     await db.execute(stmt)
     await db.flush()

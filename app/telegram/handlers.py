@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import uuid
 from pathlib import Path
 
 from aiogram import F, Router
@@ -115,8 +116,15 @@ async def _persist_session(chat_id: int) -> None:
             lat=s.get("lat"),
             lon=s.get("lon"),
             voice=s.get("voice", False),
+            active_conversation_id=s.get("conversation_id"),
         )
         await db.commit()
+
+
+def _conv_id(session: dict, chat_id: int) -> str:
+    """Active conversation id for this chat. Defaults to str(chat_id) for users who
+    have never run /new (back-compat); rotated to a fresh id by /new."""
+    return session.get("conversation_id") or str(chat_id)
 
 
 # ── Keyboards ─────────────────────────────────────────────────────────────────
@@ -390,31 +398,38 @@ async def cmd_voice(message: Message) -> None:
 async def cmd_new(message: Message) -> None:
     chat_id = message.chat.id
     session = await _get_session(chat_id)
-    # Keep persona and lang, clear location
+    # Keep persona and lang, clear location, and rotate to a fresh DB conversation
+    # so prior history is no longer loaded into the LLM context.
     session["lat"] = None
     session["lon"] = None
+    session["conversation_id"] = f"{chat_id}-{uuid.uuid4().hex[:8]}"
     await _persist_session(chat_id)
-    logger.info("\033[34mTG   ›\033[0m new conversation  chat=\033[36m%d\033[0m", chat_id)
+    logger.info(
+        "\033[34mTG   ›\033[0m new conversation  chat=\033[36m%d\033[0m  conv=\033[36m%s\033[0m",
+        chat_id,
+        session["conversation_id"],
+    )
     await message.answer(_t("new_conv", _ui(session)), reply_markup=_location_markup(_ui(session)))
 
 
 @router.message(Command("history"))
 async def cmd_history(message: Message) -> None:
     chat_id = message.chat.id
+    session = await _get_session(chat_id)
+    cid = _conv_id(session, chat_id)
     async with AsyncSessionLocal() as db:
-        conv_result = await db.execute(select(ConversationORM).where(ConversationORM.id == str(chat_id)))
+        conv_result = await db.execute(select(ConversationORM).where(ConversationORM.id == cid))
         conv = conv_result.scalar_one_or_none()
 
         user_msg_count = 0
         if conv:
             count_result = await db.execute(
                 select(func.count(MessageORM.id))
-                .where(MessageORM.conversation_id == str(chat_id))
+                .where(MessageORM.conversation_id == cid)
                 .where(MessageORM.role == "user")
             )
             user_msg_count = count_result.scalar() or 0
 
-    session = await _get_session(chat_id)
     lang = _ui(session)
 
     if not conv:
@@ -621,6 +636,7 @@ async def cb_open_setting(callback: CallbackQuery) -> None:
     elif action == "new":
         session["lat"] = None
         session["lon"] = None
+        session["conversation_id"] = f"{chat_id}-{uuid.uuid4().hex[:8]}"
         await _persist_session(chat_id)
         try:
             await callback.message.edit_reply_markup(reply_markup=None)
@@ -748,6 +764,7 @@ async def _dispatch(
     persona = Persona(session.get("persona", Persona.historian))
     lang = session.get("lang", "auto")
     fmt = session.get("fmt", RESPONSE_FORMAT)
+    conv_id = _conv_id(session, chat_id)
 
     request = ChatRequest(
         latitude=lat,
@@ -755,7 +772,7 @@ async def _dispatch(
         persona=persona,
         message=user_message or "",
         photo_url=photo_url,
-        conversation_id=str(chat_id),
+        conversation_id=conv_id,
         user_name=message.from_user.first_name if message.from_user else None,
         language=None if lang == "auto" else lang,
         response_format=fmt,
@@ -766,7 +783,6 @@ async def _dispatch(
     map_image: bytes | None = None
     wiki_image: bytes | None = None
     commons_image: bytes | None = None
-    conv_id = str(chat_id)
     try:
         async with AsyncSessionLocal() as db:
             response = await handle_chat(request, db)
